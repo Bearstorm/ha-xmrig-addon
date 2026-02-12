@@ -1,88 +1,99 @@
 # 🪙 XMRig Miner Add-on for Home Assistant
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
-![Architecture](https://img.shields.io/badge/Arch-x86__64%20(amd64)-orange.svg)
+![Architecture](https://img.shields.io/badge/Arch-amd64-orange.svg)
+![HAOS Compatible](https://img.shields.io/badge/HAOS-Compatible-green.svg)
+![Supervised](https://img.shields.io/badge/Supervised-Debian%2012-blue.svg)
+![MSR Optional](https://img.shields.io/badge/MSR-Optional-yellow.svg)
+![RandomX Optimized](https://img.shields.io/badge/RandomX-Optimized-red.svg)
 
-High-performance and fully configurable Monero (XMR) mining add-on for the Home Assistant ecosystem.  
-Optimized for **x86_64 (amd64)** architecture, specifically tuned for modern Intel (10th–12th Gen) and AMD processors.
+High-performance and fully configurable **Monero (XMR)** mining add-on for the Home Assistant ecosystem.  
+Optimized for **x86_64 (amd64)** architecture and tuned for modern Intel (10th–12th Gen) and AMD processors.
 
-> ⚠️ **Important:** Versions older than **6.21.6** are not recommended due to unstable MSR handling and privilege inconsistencies.
+> ⚠ **Important:** Versions older than **6.21.6** are not recommended due to unstable MSR handling and privilege inconsistencies.
+
+---
+
+## 📑 Table of Contents
+
+- [System Requirements](#-system-requirements)
+- [Installation](#-installation)
+- [Configuration](#-configuration)
+- [MSR Optimization (Advanced)](#-msr-optimization-advanced)
+- [Security Model](#-security-model)
+- [Performance Notes](#-performance-notes)
+- [Troubleshooting](#-troubleshooting)
+- [Risks & Disclaimer](#-risks--disclaimer)
+- [License](#-license)
 
 ---
 
 ## 💻 System Requirements
 
-To run this miner efficiently without impacting Home Assistant stability:
+To ensure stable operation alongside Home Assistant:
 
 - **Architecture:** x86_64 (Intel or AMD)  
   ARM devices (e.g., Raspberry Pi) are **NOT supported**
-- **Minimum CPU:** 4-core processor (Intel Celeron J4125 or newer)
-- **Recommended CPU:** Intel Core i5/i7 (10th Gen+) or AMD Ryzen 5+  
-  Higher L3 cache significantly improves hashrate
-- **RAM:** 4GB minimum (8GB+ recommended if running Frigate or heavy add-ons)
-- **Storage:** ~500MB free space
-- **OS:** Home Assistant OS or Home Assistant Supervised (Debian 12 recommended)
-
----
-
-## 🚀 Features
-
-- ⚙️ Optimized for modern x86_64 CPUs
-- 🏠 Native Home Assistant integration
-- 🎛️ Adjustable CPU threads
-- ⚖️ Configurable CPU priority
-- 🔧 Built-in MSR optimization toggle
-- 🔐 Compatible with Protection Mode
+- **Minimum CPU:** 4 cores
+- **Recommended CPU:** Intel i5/i7 (10th Gen+) or AMD Ryzen 5+
+- **RAM:** 4GB minimum (8GB+ recommended if running Frigate)
+- **Storage:** ~500MB free
+- **OS:**  
+  - Home Assistant OS (HAOS)  
+  - Home Assistant Supervised (Debian 12 recommended)
 
 ---
 
 ## 📥 Installation
 
-1. Go to **Settings → Add-ons → Add-on Store**
-2. Click the **⋮ menu** (top right) → **Repositories**
+1. Navigate to **Settings → Add-ons → Add-on Store**
+2. Click **⋮ → Repositories**
 3. Add:
-   ```
-   https://github.com/Bearstorm/ha-xmrig-addon
-   ```
+
+```
+https://github.com/Bearstorm/ha-xmrig-addon
+```
+
 4. Install **XMRig Miner**
-5. Configure and start
+5. Configure wallet and pool
+6. Start the add-on
 
 ---
 
-## ⚙️ Configuration Options
+## ⚙ Configuration
 
-| Option | Description | Impact |
-|--------|------------|--------|
-| `pool` | Mining pool address | Where hashing power is directed |
-| `port` | Pool port (443 recommended) | Enables TLS |
-| `wallet` | Your XMR wallet address | Required for payouts |
-| `worker` | Worker name | Visible in pool stats |
-| `threads` | CPU threads to use | Higher = higher hashrate |
-| `priority` | CPU priority (0–5) | 2 recommended |
-| `msr_mod` | Enable MSR optimization | +Performance if supported |
+| Option | Description | Recommended |
+|--------|------------|------------|
+| `pool` | Mining pool address | pool.supportxmr.com |
+| `port` | Pool port (443 enables TLS) | 443 |
+| `wallet` | Your Monero wallet address | Required |
+| `worker` | Worker name identifier | HA |
+| `threads` | CPU threads used | Total threads - 2 |
+| `priority` | CPU priority (0–5) | 2 |
+| `msr_mod` | Enables MSR optimization | true (if supported) |
 
 ---
 
-# ⚡ MSR Optimization (Advanced)
+## ⚡ MSR Optimization (Advanced)
 
-MSR (Model Specific Register) tuning can increase RandomX performance by up to ~20% on supported Intel CPUs.
+MSR (Model Specific Register) optimization can increase RandomX performance by up to **~20%** on supported Intel CPUs.
 
-## 🔄 Built-in MSR Toggle
+### Built-in MSR Toggle
 
-From version **6.21.6+**, MSR optimization can be enabled or disabled directly:
+From version **6.21.6+**, MSR can be controlled directly:
 
 | Setting | Behavior |
 |----------|----------|
 | `msr_mod: true` | Enables MSR optimization |
-| `msr_mod: false` | Disables MSR optimization completely |
+| `msr_mod: false` | Disables MSR completely |
 
-If disabled, XMRig runs normally without MSR tuning (slightly lower hashrate, maximum stability).
+If disabled, XMRig runs normally (slightly lower hashrate, fully stable).
 
 ---
 
-## 🖥️ Home Assistant Supervised (Debian Host)
+### 🖥 Home Assistant Supervised (Debian Host)
 
-MSR must be enabled on the **host system** (not inside the container):
+MSR must be enabled on the **host system**, not inside the container:
 
 ```bash
 sudo apt update
@@ -94,48 +105,106 @@ sudo modprobe msr
 Then in Home Assistant:
 
 1. Open the add-on  
-2. Go to the **Info** tab  
+2. Go to **Info** tab  
 3. Disable **Protection Mode**  
 4. Restart the add-on  
-5. Enable `msr_mod` in **Configuration**
+5. Enable `msr_mod` in Configuration  
 
 ---
 
-## 🧩 Home Assistant OS (HAOS)
+### 🧩 Home Assistant OS (HAOS)
 
 1. Open the add-on  
-2. Go to the **Info** tab  
+2. Go to **Info** tab  
 3. Disable **Protection Mode**  
 4. Restart the add-on  
-5. Enable `msr_mod` in **Configuration**
+5. Enable `msr_mod` in Configuration  
 
-> ℹ️ Some HAOS kernel or security configurations may restrict MSR access even with Protection Mode disabled.
-
----
-
-# 🔒 Protection Mode Explained
-
-- **Enabled:** Maximum security, MSR access blocked  
-- **Disabled:** Required for MSR optimization  
-- Safe to keep enabled if `msr_mod: false`
+> ℹ Some HAOS kernel versions may restrict MSR access even with Protection Mode disabled.
 
 ---
 
-# ⚠️ Disclaimer & Risks
+## 🔐 Security Model
 
-- Disabling Protection Mode grants hardware-level access  
-- Mining increases CPU temperature (+15–25°C typical)  
-- Leave at least 2 threads free for system stability  
+This add-on uses elevated privileges when MSR is enabled.
+
+### Protection Mode
+
+| Mode | Effect |
+|------|--------|
+| Enabled | Restricted hardware access |
+| Disabled | Full hardware access (required for MSR) |
+
+Disabling Protection Mode grants hardware-level CPU register access.
+
+Only disable if you trust the source code.
+
+---
+
+## 📊 Performance Notes
+
+Example performance (i5-12500T):
+
+| Threads | MSR | Hashrate |
+|----------|------|-----------|
+| 2 | OFF | ~2000 H/s |
+| 2 | ON | ~2400 H/s |
+| 4 | ON | ~2500 H/s |
+
+Performance depends heavily on:
+- L3 cache size
+- Memory speed
+- Cooling quality
+
+---
+
+## 🛠 Troubleshooting
+
+### Common MSR Issues
+
+| Log Message | Meaning | Solution |
+|-------------|----------|----------|
+| `msr kernel module is not available` | MSR not loaded on host | Run `modprobe msr` |
+| `FAILED TO APPLY MSR MOD` | Protection mode enabled | Disable Protection Mode |
+| `cannot read MSR 0x000001a4` | Kernel blocking MSR | Check HAOS kernel restrictions |
+| Low hashrate | MSR disabled or few threads | Enable MSR or increase threads |
+
+---
+
+### Verify MSR is Working
+
+When successful, logs should show:
+
+```
+register values for "intel" preset have been set successfully
+```
+
+If you see:
+
+```
+FAILED TO APPLY MSR MOD
+```
+
+MSR is not active.
+
+---
+
+## ⚠ Risks & Disclaimer
+
+- Mining increases CPU temperature by 15–25°C
+- Ensure proper cooling
+- Disabling Protection Mode reduces container isolation
 - Use at your own risk
 
 ---
 
-# 📄 License
+## 📄 License
 
 Creative Commons Attribution-NoDerivs 4.0 International (CC BY-ND 4.0)
 
-You may share and use this add-on.  
-Modified versions may not be redistributed.
+You may use and share this project.  
+Modified distributions are not permitted.
+
 
 ---
 
