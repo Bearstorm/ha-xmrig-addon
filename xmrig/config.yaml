@@ -1,7 +1,7 @@
 name: XMRig Miner
 slug: xmrig
 description: High-performance Monero miner with CPU and thread control.
-version: "6.21.6"
+version: "6.21.7"
 url: "https://github.com/Bearstorm/ha-xmrig-addon"
 
 arch:
@@ -14,7 +14,7 @@ init: false
 host_network: true
 host_pid: true
 
-# DÔLEŽITÉ: pri MSR zápise to často blokuje AppArmor profil
+# Dôležité pre MSR + menej obmedzení profilu:
 apparmor: false
 
 privileged:
@@ -34,10 +34,8 @@ options:
   port: 443
   wallet: ""
   worker: "HA"
-  threads: 0
+  threads: 2
   priority: 2
-
-  # Varianta B: užívateľ si prepne MSR mod sám
   msr_mod: true
 
 schema:
