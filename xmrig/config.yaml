@@ -3,6 +3,7 @@ slug: xmrig
 description: High-performance Monero miner with CPU and thread control.
 version: "6.21.4"
 url: "https://github.com/Bearstorm/ha-xmrig-addon"
+
 arch:
   - amd64
 
@@ -10,14 +11,16 @@ startup: services
 boot: auto
 init: false
 
+# aby to vedelo pool DNS a priamo sieť (ponechaj, ak to repo používa)
 host_network: true
 
-
+# Kľúčové pre MSR mod
 privileged:
   - SYS_RAWIO
   - SYS_NICE
   - IPC_LOCK
 
+# namapuj /dev/cpu z hosta
 devices:
   - /dev/cpu:/dev/cpu:rwm
 
@@ -26,35 +29,20 @@ map:
   - share:rw
 
 options:
-  pool: "pool.supportxmr.com:443"
+  pool: "pool.supportxmr.com"
+  port: 443
   user: ""
-  pass: "debianha"
-  tls: true
-  algo: "rx/0"
+  pass: "x"
   threads: 0
-  donate: 1
-  http_enabled: true
-  http_host: "0.0.0.0"
-  http_port: 18088
-  http_access_token: ""
-  http_restricted: true
-  log_level: "info"
+  priority: 0
 
 schema:
   pool: str
+  port: int
   user: str
   pass: str
-  tls: bool
-  algo: str
   threads: int
-  donate: int
-  http_enabled: bool
-  http_host: str
-  http_port: int
-  http_access_token: str?
-  http_restricted: bool
-  log_level: list(trace|debug|info|notice|warning|error|fatal)
+  priority: int
 
+# (ak repo používa image template, nechaj; ak nie, prispôsob podľa repo)
 image: "ghcr.io/bearstorm/{arch}-ha-xmrig-addon"
-
-
