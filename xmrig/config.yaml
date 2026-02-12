@@ -18,7 +18,6 @@ privileged:
   - SYS_NICE
   - IPC_LOCK
 
-# dôležité: namapuj celé /dev/cpu ako rw
 devices:
   - /dev/cpu:/dev/cpu:rwm
 
