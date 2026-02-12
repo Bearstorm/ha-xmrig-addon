@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk add --no-cache wget tar ca-certificates msr-tools
+RUN apk add --no-cache wget tar ca-certificates jq msr-tools
 
 RUN wget https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-static-x64.tar.gz \
     && tar -xf xmrig-6.21.0-linux-static-x64.tar.gz \
