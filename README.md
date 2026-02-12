@@ -7,7 +7,10 @@
 ![MSR Optional](https://img.shields.io/badge/MSR-Optional-yellow.svg)
 ![RandomX Optimized](https://img.shields.io/badge/RandomX-Optimized-red.svg)
 
-High-performance and fully configurable **Monero (XMR)** mining add-on for the Home Assistant ecosystem.  
+![Build Status](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/publish.yml/badge.svg)
+![GHCR Pulls](https://img.shields.io/badge/dynamic/json?color=blue&label=GHCR%20Pulls&query=$.pull_count&url=https://ghcr.io/v2/bearstorm/ha-xmrig-addon/xmrig)
+
+High-performance and fully configurable **Monero (XMR)** mining add-on for Home Assistant.  
 Optimized for **x86_64 (amd64)** architecture and tuned for modern Intel (10th–12th Gen) and AMD processors.
 
 > ⚠ **Important:** Versions older than **6.21.6** are not recommended due to unstable MSR handling and privilege inconsistencies.
@@ -19,10 +22,14 @@ Optimized for **x86_64 (amd64)** architecture and tuned for modern Intel (10th�
 - [System Requirements](#-system-requirements)
 - [Installation](#-installation)
 - [Configuration](#-configuration)
-- [MSR Optimization (Advanced)](#-msr-optimization-advanced)
+- [MSR Optimization](#-msr-optimization-advanced)
 - [Security Model](#-security-model)
 - [Performance Notes](#-performance-notes)
+- [Kernel Compatibility Matrix](#-kernel-compatibility-matrix)
 - [Troubleshooting](#-troubleshooting)
+- [Known Limitations](#-known-limitations)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
 - [Risks & Disclaimer](#-risks--disclaimer)
 - [License](#-license)
 
@@ -30,23 +37,19 @@ Optimized for **x86_64 (amd64)** architecture and tuned for modern Intel (10th�
 
 ## 💻 System Requirements
 
-To ensure stable operation alongside Home Assistant:
-
 - **Architecture:** x86_64 (Intel or AMD)  
-  ARM devices (e.g., Raspberry Pi) are **NOT supported**
+- ARM devices (Raspberry Pi) are **NOT supported**
 - **Minimum CPU:** 4 cores
 - **Recommended CPU:** Intel i5/i7 (10th Gen+) or AMD Ryzen 5+
 - **RAM:** 4GB minimum (8GB+ recommended if running Frigate)
 - **Storage:** ~500MB free
-- **OS:**  
-  - Home Assistant OS (HAOS)  
-  - Home Assistant Supervised (Debian 12 recommended)
+- **OS:** HAOS or Supervised (Debian 12 recommended)
 
 ---
 
 ## 📥 Installation
 
-1. Navigate to **Settings → Add-ons → Add-on Store**
+1. Go to **Settings → Add-ons → Add-on Store**
 2. Click **⋮ → Repositories**
 3. Add:
 
@@ -56,7 +59,7 @@ https://github.com/Bearstorm/ha-xmrig-addon
 
 4. Install **XMRig Miner**
 5. Configure wallet and pool
-6. Start the add-on
+6. Start
 
 ---
 
@@ -65,35 +68,29 @@ https://github.com/Bearstorm/ha-xmrig-addon
 | Option | Description | Recommended |
 |--------|------------|------------|
 | `pool` | Mining pool address | pool.supportxmr.com |
-| `port` | Pool port (443 enables TLS) | 443 |
-| `wallet` | Your Monero wallet address | Required |
-| `worker` | Worker name identifier | HA |
-| `threads` | CPU threads used | Total threads - 2 |
+| `port` | Pool port | 443 |
+| `wallet` | Monero wallet address | Required |
+| `worker` | Worker name | HA |
+| `threads` | CPU threads used | Total - 2 |
 | `priority` | CPU priority (0–5) | 2 |
-| `msr_mod` | Enables MSR optimization | true (if supported) |
+| `msr_mod` | Enables MSR optimization | true |
 
 ---
 
 ## ⚡ MSR Optimization (Advanced)
 
-MSR (Model Specific Register) optimization can increase RandomX performance by up to **~20%** on supported Intel CPUs.
+MSR optimization may improve performance by **~20%** on supported Intel CPUs.
 
-### Built-in MSR Toggle
-
-From version **6.21.6+**, MSR can be controlled directly:
+### Toggle MSR
 
 | Setting | Behavior |
 |----------|----------|
-| `msr_mod: true` | Enables MSR optimization |
-| `msr_mod: false` | Disables MSR completely |
-
-If disabled, XMRig runs normally (slightly lower hashrate, fully stable).
+| `msr_mod: true` | Enables MSR |
+| `msr_mod: false` | Fully disables MSR |
 
 ---
 
-### 🖥 Home Assistant Supervised (Debian Host)
-
-MSR must be enabled on the **host system**, not inside the container:
+### Home Assistant Supervised (Debian Host)
 
 ```bash
 sudo apt update
@@ -102,98 +99,111 @@ echo "msr" | sudo tee -a /etc/modules
 sudo modprobe msr
 ```
 
-Then in Home Assistant:
-
-1. Open the add-on  
-2. Go to **Info** tab  
-3. Disable **Protection Mode**  
-4. Restart the add-on  
-5. Enable `msr_mod` in Configuration  
+Then:
+- Disable **Protection Mode**
+- Restart add-on
+- Enable `msr_mod`
 
 ---
 
-### 🧩 Home Assistant OS (HAOS)
+### Home Assistant OS (HAOS)
 
-1. Open the add-on  
-2. Go to **Info** tab  
-3. Disable **Protection Mode**  
-4. Restart the add-on  
-5. Enable `msr_mod` in Configuration  
+- Disable **Protection Mode**
+- Restart add-on
+- Enable `msr_mod`
 
-> ℹ Some HAOS kernel versions may restrict MSR access even with Protection Mode disabled.
+> Some HAOS kernel versions restrict MSR access.
 
 ---
 
 ## 🔐 Security Model
 
-This add-on uses elevated privileges when MSR is enabled.
+| Feature | Required For |
+|----------|--------------|
+| Protection Mode OFF | MSR access |
+| Full hardware access | MSR tuning |
+| Host PID | Low-level CPU operations |
 
-### Protection Mode
-
-| Mode | Effect |
-|------|--------|
-| Enabled | Restricted hardware access |
-| Disabled | Full hardware access (required for MSR) |
-
-Disabling Protection Mode grants hardware-level CPU register access.
-
-Only disable if you trust the source code.
+Disable Protection Mode only if trusted.
 
 ---
 
 ## 📊 Performance Notes
 
-Example performance (i5-12500T):
+| CPU | Threads | MSR | Hashrate |
+|------|----------|------|-----------|
+| i5-12500T | 2 | OFF | ~2000 H/s |
+| i5-12500T | 2 | ON | ~2400 H/s |
+| i5-12500T | 4 | ON | ~2500 H/s |
 
-| Threads | MSR | Hashrate |
-|----------|------|-----------|
-| 2 | OFF | ~2000 H/s |
-| 2 | ON | ~2400 H/s |
-| 4 | ON | ~2500 H/s |
+Performance depends on L3 cache and memory speed.
 
-Performance depends heavily on:
-- L3 cache size
-- Memory speed
-- Cooling quality
+---
+
+## 🧩 Kernel Compatibility Matrix
+
+| Platform | Kernel | MSR Support | Notes |
+|-----------|--------|------------|--------|
+| Debian 12 | 6.x | ✅ Full | Recommended |
+| HAOS 11 | 6.x | ⚠ Partial | Depends on security policy |
+| HAOS 10 | 5.x | ⚠ Limited | MSR may be blocked |
+| Generic Docker | varies | ❌ Not supported | Host module required |
 
 ---
 
 ## 🛠 Troubleshooting
 
-### Common MSR Issues
-
-| Log Message | Meaning | Solution |
-|-------------|----------|----------|
-| `msr kernel module is not available` | MSR not loaded on host | Run `modprobe msr` |
-| `FAILED TO APPLY MSR MOD` | Protection mode enabled | Disable Protection Mode |
-| `cannot read MSR 0x000001a4` | Kernel blocking MSR | Check HAOS kernel restrictions |
-| Low hashrate | MSR disabled or few threads | Enable MSR or increase threads |
+| Log Message | Meaning | Fix |
+|-------------|----------|------|
+| `msr kernel module is not available` | MSR not loaded | `modprobe msr` |
+| `FAILED TO APPLY MSR MOD` | Protection mode ON | Disable Protection Mode |
+| `cannot read MSR 0x000001a4` | Kernel blocking MSR | Check kernel policy |
+| Low hashrate | MSR disabled | Enable `msr_mod` |
 
 ---
 
-### Verify MSR is Working
+## ⚠ Known Limitations
 
-When successful, logs should show:
+- ARM architecture not supported
+- MSR only benefits Intel CPUs
+- HAOS kernel security policies may block MSR
+- Cannot bypass kernel-level MSR restrictions
+- MSR optimization not available in protected container mode
 
-```
-register values for "intel" preset have been set successfully
-```
+---
 
-If you see:
+## 🗺 Roadmap
 
-```
-FAILED TO APPLY MSR MOD
-```
+- [ ] Auto-detect MSR availability
+- [ ] Add dynamic thread auto-scaling
+- [ ] Add performance dashboard sensor entities
+- [ ] Add optional power usage estimation
+- [ ] Improve kernel compatibility detection
+- [ ] Add multi-arch build (future evaluation)
 
-MSR is not active.
+---
+
+## 🤝 Contributing
+
+Contributions are welcome.
+
+1. Fork the repository
+2. Create feature branch
+3. Commit changes
+4. Open Pull Request
+
+Please ensure:
+- Code follows existing structure
+- Docker builds pass
+- Changelog is updated
 
 ---
 
 ## ⚠ Risks & Disclaimer
 
-- Mining increases CPU temperature by 15–25°C
+- Mining increases CPU temperature (15–25°C)
 - Ensure proper cooling
-- Disabling Protection Mode reduces container isolation
+- Disabling Protection Mode reduces isolation
 - Use at your own risk
 
 ---
@@ -202,7 +212,6 @@ MSR is not active.
 
 Creative Commons Attribution-NoDerivs 4.0 International (CC BY-ND 4.0)
 
-You may use and share this project.  
 Modified distributions are not permitted.
 
 
