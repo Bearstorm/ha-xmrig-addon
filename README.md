@@ -90,6 +90,8 @@ For Home Assistant OS (HAOS)
 
 Use this add-on at your own risk.
 
+---
+
 📄 License
 
 This project is licensed under the Creative Commons Attribution-NoDerivs 4.0 International (CC BY-ND 4.0).
