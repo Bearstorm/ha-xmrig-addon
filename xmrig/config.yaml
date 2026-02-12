@@ -1,18 +1,23 @@
 name: "XMRig Miner"
-version: "6.21.1"
+version: "6.21.2"
 slug: "xmrig"
-description: "High-performance Monero miner for x86_64 (amd64) architecture"
+description: "High-performance Monero miner with CPU control"
 arch:
   - amd64
 startup: services
 boot: auto
+full_access: true
 options:
   pool: "pool.supportxmr.com"
-  port: "5555"
+  port: "443"
   user: "YOUR_XMR_WALLET_ADDRESS"
   pass: "node_01"
+  threads: 6
+  priority: 2
 schema:
   pool: str
   port: str
   user: str
   pass: str
+  threads: int
+  priority: int
