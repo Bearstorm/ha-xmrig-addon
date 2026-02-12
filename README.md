@@ -8,7 +8,8 @@
 ![RandomX Optimized](https://img.shields.io/badge/RandomX-Optimized-red.svg)
 
 ![Build Status](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/publish.yml/badge.svg)
-![GHCR Pulls](https://img.shields.io/badge/dynamic/json?color=blue&label=GHCR%20Pulls&query=$.pull_count&url=https://ghcr.io/v2/bearstorm/ha-xmrig-addon/xmrig)
+![GHCR](https://img.shields.io/badge/GHCR-Available-blue)
+
 
 High-performance and fully configurable **Monero (XMR)** mining add-on for Home Assistant.  
 Optimized for **x86_64 (amd64)** architecture and tuned for modern Intel (10th–12th Gen) and AMD processors.
