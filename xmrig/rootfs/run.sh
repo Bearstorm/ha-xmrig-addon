@@ -9,6 +9,7 @@ WALLET="$(jq -r '.wallet // ""' "$CONFIG_PATH")"
 WORKER="$(jq -r '.worker // ""' "$CONFIG_PATH")"
 THREADS="$(jq -r '.threads // 0' "$CONFIG_PATH")"
 PRIO="$(jq -r '.priority // 0' "$CONFIG_PATH")"
+MSR_MOD="$(jq -r '.msr_mod // true' "$CONFIG_PATH")"
 
 POOL_CLEAN="$(echo "$POOL" | sed 's#^[a-zA-Z0-9+.-]*://##')"
 
@@ -41,6 +42,7 @@ fi
 echo "[xmrig-addon] Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
 echo "[xmrig-addon] Wallet: ${WALLET}"
 echo "[xmrig-addon] Worker: ${WORKER}"
+echo "[xmrig-addon] MSR mod enabled: ${MSR_MOD}"
 
 if [ -c /dev/cpu/0/msr ]; then
   echo "[xmrig-addon] MSR device present: /dev/cpu/0/msr"
@@ -49,13 +51,24 @@ else
 fi
 
 # --- MSR SELF-TEST (container) ---
-# If rdmsr is available, verify we can read 0x1a4 from inside the container.
+# 1) Read test (rdmsr)
+# 2) Write test (wrmsr) = zapíše späť rovnakú hodnotu (bezpečnejšie než meniť)
 if command -v rdmsr >/dev/null 2>&1; then
   echo "[xmrig-addon] MSR self-test: rdmsr 0x1a4"
-  if rdmsr 0x1a4 >/dev/null 2>&1; then
-    echo "[xmrig-addon] MSR self-test: OK"
+  if RDVAL="$(rdmsr 0x1a4 2>/dev/null)"; then
+    echo "[xmrig-addon] MSR self-test: READ OK (0x1a4=${RDVAL})"
+    if command -v wrmsr >/dev/null 2>&1; then
+      echo "[xmrig-addon] MSR self-test: wrmsr 0x1a4 (restore same value)"
+      if wrmsr 0x1a4 "0x${RDVAL}" >/dev/null 2>&1; then
+        echo "[xmrig-addon] MSR self-test: WRITE OK"
+      else
+        echo "[xmrig-addon] MSR self-test: WRITE FAIL (wrmsr blocked inside container)"
+      fi
+    else
+      echo "[xmrig-addon] MSR self-test: wrmsr not installed (skipping write test)"
+    fi
   else
-    echo "[xmrig-addon] MSR self-test: FAIL (rdmsr cannot read 0x1a4 inside container)"
+    echo "[xmrig-addon] MSR self-test: READ FAIL (rdmsr cannot read 0x1a4 inside container)"
   fi
 else
   echo "[xmrig-addon] MSR self-test: rdmsr not installed (skipping)"
@@ -77,6 +90,12 @@ if [ "$PRIO" -gt 0 ] 2>/dev/null; then
   PRIO_ARGS="--cpu-priority=${PRIO}"
 fi
 
+# Varianta B: užívateľ vypne MSR mod -> XMRig prestane hlásiť MSR chyby (bez boostu)
+MSR_ARGS=""
+if [ "$MSR_MOD" = "false" ]; then
+  MSR_ARGS="--randomx-wrmsr=-1"
+fi
+
 exec /usr/bin/xmrig \
   --url "${POOL_HOST}:${POOL_PORT}" \
   --user "$WALLET" \
@@ -84,5 +103,7 @@ exec /usr/bin/xmrig \
   $TLS_ARGS \
   $THREAD_ARGS \
   $PRIO_ARGS \
+  $MSR_ARGS \
   --randomx-mode=fast
+
 
