@@ -23,22 +23,18 @@ devices:
 
 kernel_modules: true
 
-map:
-  - addon_config:rw
-  - share:rw
-
 options:
   pool: "pool.supportxmr.com"
   port: 443
-  user: ""
-  pass: ""
+  wallet: ""
+  worker: "HA"
   threads: 0
-  priority: 0
+  priority: 2
 
 schema:
   pool: str
   port: int
-  user: str
-  pass: str
+  wallet: str
+  worker: str
   threads: int
   priority: int
