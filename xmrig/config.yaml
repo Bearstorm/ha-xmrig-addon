@@ -13,11 +13,13 @@ init: false
 
 host_network: true
 
+# Dôležité capabilities pre MSR + randomx / priority
 privileged:
   - SYS_RAWIO
   - SYS_NICE
   - IPC_LOCK
 
+# Dôležité: explicitne bindni /dev/cpu ako rwm
 devices:
   - /dev/cpu:/dev/cpu:rwm
 
@@ -27,9 +29,9 @@ options:
   pool: "pool.supportxmr.com"
   port: 443
   wallet: ""
-  worker: ""
+  worker: "HA"
   threads: 0
-  priority: 0
+  priority: 2
 
 schema:
   pool: str
@@ -38,4 +40,5 @@ schema:
   worker: str
   threads: int
   priority: int
+
 
