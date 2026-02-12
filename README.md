@@ -1,36 +1,50 @@
-🪙 XMRig Miner Add-on for Home Assistant
+# 🪙 XMRig Miner Add-on for Home Assistant
 
-A high-performance custom add-on to run XMRig (Monero miner) directly within your Home Assistant ecosystem. Optimized for stability and system longevity.
-🚀 Features
+[![Home Assistant Badge](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
+![Architecture x86_64](https://img.shields.io/badge/Arch-x86__64%20(amd64)-orange.svg)
 
-    ⚙️ Architecture Optimized: Specifically tuned for x86_64 (amd64) processors.
+High-performance and fully configurable Monero (XMR) mining add-on for the Home Assistant ecosystem. Optimized for **x86_64 (amd64)** architecture, specifically tuned for Intel 12th Gen processors.
 
-    🏠 Native Integration: Runs as a standard Home Assistant service.
+---
 
-    ⚖️ Smart Resource Management: Uses low process priority (nice -n 15) to ensure Frigate, Zigbee2MQTT, and the Core always have priority.
+### 🚀 Features
+* ⚙️ **Architecture Optimized:** Specifically tuned for modern x86_64 CPUs.
+* 🏠 **Native Integration:** Runs as a standard Home Assistant service.
+* ⚖️ **Resource Management:** Uses low process priority to ensure critical services like **Frigate** or **Zigbee2MQTT** remain unaffected.
+* 🛠️ **Full Control:** Configure CPU threads and priority directly via the web interface.
 
-    🛠️ Simple Web UI Config: No terminal needed for basic settings.
+---
 
-📥 Installation
+### 📥 Installation
 
-    Open your Home Assistant dashboard.
+1. In Home Assistant, navigate to **Settings** ➡️ **Add-ons** ➡️ **Add-on Store**.
+2. Click the **⋮** (top right) and select **Repositories**.
+3. Add the following URL: `https://github.com/Bearstorm/ha-xmrig-addon`
+4. Click **Add**, then **Close**.
+5. Search for **"XMRig Miner"** and click **Install**.
 
-    Go to Settings ➡️ Add-ons ➡️ Add-on Store.
+---
 
-    Click the ⋮ (top right) and select Repositories.
+### ⚙️ Configuration Explained
 
-    Add this URL:
+Each option in the configuration tab affects miner behavior and system resource allocation:
 
-    https://github.com/Bearstorm/ha-xmrig-addon
+| Option | Description | System Impact |
+| :--- | :--- | :--- |
+| **`pool`** | Pool address (e.g., `pool.supportxmr.com`). | Determines where your hashing power is directed. |
+| **`port`** | Connection port (Standard `5555`, or `443` for TLS). | Port 443 with TLS enabled masks mining as standard HTTPS traffic. |
+| **`user`** | Your Monero (XMR) wallet address. | **Critical:** If the address is incorrect, you will not receive rewards. |
+| **`pass`** | Worker name (e.g., `HP_Pro_Mini`). | Used to identify your machine in pool statistics. |
+| **`threads`** | Number of allocated CPU threads. | **Performance:** Higher value = higher hashrate/temp. Keep at least 2 threads free for the OS. |
+| **`priority`** | CPU scheduling priority (0 to 5). | **2 (Recommended):** Ensures Home Assistant stability while maintaining mining performance. |
 
-    Click Add, then Close.
+---
 
-    Search for "XMRig Miner" in the store and click Install.
+### ⚡ Performance Optimization (MSR Mod)
+To resolve the `FAILED TO APPLY MSR MOD` error and increase performance by ~20%, you must allow access to CPU registers:
 
-🔧 Configuration
-
-Add your mining details in the Configuration tab:
-
-pool: "Your XMR mining pool address"
-user: "Your Monero (XMR) wallet address"
-pass: "Worker identifier (name for this machine)"
+1. **On your Debian Host (Terminal):**
+   Run these commands to enable MSR support:
+   ```bash
+   sudo apt update && sudo apt install msr-tools -y
+   sudo modprobe msr
