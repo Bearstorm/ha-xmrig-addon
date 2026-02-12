@@ -1,4 +1,3 @@
-
 #!/bin/sh
 set -eu
 
@@ -49,6 +48,20 @@ else
   echo "[xmrig-addon] WARNING: MSR device missing: /dev/cpu/0/msr"
 fi
 
+# --- MSR SELF-TEST (container) ---
+# If rdmsr is available, verify we can read 0x1a4 from inside the container.
+if command -v rdmsr >/dev/null 2>&1; then
+  echo "[xmrig-addon] MSR self-test: rdmsr 0x1a4"
+  if rdmsr 0x1a4 >/dev/null 2>&1; then
+    echo "[xmrig-addon] MSR self-test: OK"
+  else
+    echo "[xmrig-addon] MSR self-test: FAIL (rdmsr cannot read 0x1a4 inside container)"
+  fi
+else
+  echo "[xmrig-addon] MSR self-test: rdmsr not installed (skipping)"
+fi
+# --- /MSR SELF-TEST ---
+
 TLS_ARGS=""
 if [ "$POOL_PORT" = "443" ]; then
   TLS_ARGS="--tls"
@@ -72,3 +85,4 @@ exec /usr/bin/xmrig \
   $THREAD_ARGS \
   $PRIO_ARGS \
   --randomx-mode=fast
+
