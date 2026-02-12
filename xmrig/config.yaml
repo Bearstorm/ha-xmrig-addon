@@ -46,8 +46,3 @@ schema:
   threads: int
   priority: int
   msr_mod: bool
-
-
-
-
-
