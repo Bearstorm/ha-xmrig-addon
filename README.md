@@ -99,3 +99,10 @@ This project is licensed under the Creative Commons Attribution-NoDerivs 4.0 Int
    You are free to share and use this add-on.
 
    You cannot distribute modified versions of this code.
+
+---
+
+## Support me 🔥
+- 😄 PayPal one-off donation
+<a href="https://www.paypal.com/donate/?hosted_button_id=PVATF8G5NZ392">
+  <img src="https://raw.githubusercontent.com/andreostrovsky/donate-with-paypal/925c5a9e397363c6f7a477973fdeed485df5fdd9/blue.svg" alt="Donate with PayPal" height="40"/>
