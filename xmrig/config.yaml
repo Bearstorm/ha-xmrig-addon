@@ -23,7 +23,7 @@ devices:
   - /dev/cpu:/dev/cpu:rwm
 
 kernel_modules: true
-full_access: true
+# full_access: true
 
 options:
   pool: "pool.supportxmr.com"
@@ -40,6 +40,7 @@ schema:
   worker: str
   threads: int
   priority: int
+
 
 
 
