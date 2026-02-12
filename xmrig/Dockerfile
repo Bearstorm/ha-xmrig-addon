@@ -1,22 +1,14 @@
-FROM debian:bookworm-slim
-
-SHELL ["/bin/sh", "-c"]
+FROM alpine:3.19
 
 RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
-      ca-certificates \
-      wget \
-      tar \
-      jq \
-      msr-tools; \
-    rm -rf /var/lib/apt/lists/*
+  echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/main" > /etc/apk/repositories; \
+  echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/community" >> /etc/apk/repositories; \
+  apk add --no-cache wget tar ca-certificates msr-tools jq
 
-RUN set -eux; \
-    wget -O /tmp/xmrig.tar.gz https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-static-x64.tar.gz; \
-    tar -C /tmp -xf /tmp/xmrig.tar.gz; \
-    mv /tmp/xmrig-6.21.0/xmrig /usr/bin/xmrig; \
-    rm -rf /tmp/xmrig* /tmp/xmrig.tar.gz
+RUN wget https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-static-x64.tar.gz \
+    && tar -xf xmrig-6.21.0-linux-static-x64.tar.gz \
+    && mv xmrig-6.21.0/xmrig /usr/bin/xmrig \
+    && rm -rf xmrig-6.21.0*
 
 COPY rootfs/run.sh /run.sh
 RUN chmod a+x /run.sh
