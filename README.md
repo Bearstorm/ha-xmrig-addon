@@ -7,8 +7,9 @@
 ![MSR Optional](https://img.shields.io/badge/MSR-Optional-yellow.svg)
 ![RandomX Optimized](https://img.shields.io/badge/RandomX-Optimized-red.svg)
 
-![Build Status](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/publish.yml/badge.svg)
-![GHCR Pulls](https://img.shields.io/docker/pulls/bearstorm/ha-xmrig-addon?label=GHCR%20Pulls)
+![Build](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/publish.yml/badge.svg)
+![GHCR](https://img.shields.io/badge/GHCR-Published-blue)
+
 
 
 
