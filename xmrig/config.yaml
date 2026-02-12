@@ -27,9 +27,9 @@ options:
   pool: "pool.supportxmr.com"
   port: 443
   wallet: ""
-  worker: "HA"
+  worker: ""
   threads: 0
-  priority: 2
+  priority: 0
 
 schema:
   pool: str
