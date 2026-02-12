@@ -1,5 +1,5 @@
 name: "XMRig Miner"
-version: "6.21.4"
+version: "6.21.5"
 slug: "xmrig"
 description: "High-performance Monero miner with CPU and thread control"
 arch:
@@ -8,9 +8,10 @@ startup: services
 boot: auto
 full_access: true
 host_network: true
-privileged:
-  - SYS_RAWIO
-  - SYS_ADMIN
+privileged: true
+devices:
+  - /dev/cpu:/dev/cpu:rwm
+  - /dev/msr:/dev/msr:rwm
 options:
   pool: "pool.supportxmr.com"
   port: "443"
