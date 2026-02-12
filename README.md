@@ -10,6 +10,10 @@
 ![Build](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/publish.yml/badge.svg)
 ![GHCR](https://img.shields.io/badge/GHCR-Published-blue)
 
+![Build](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/publish.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/Bearstorm/ha-xmrig-addon?display_name=tag&style=flat-square)
+![License](https://img.shields.io/github/license/Bearstorm/ha-xmrig-addon?style=flat-square)
+![Visitors](https://komarev.com/ghpvc/?username=Bearstorm&repo=ha-xmrig-addon&style=flat-square)
 
 
 
