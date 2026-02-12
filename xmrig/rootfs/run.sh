@@ -10,10 +10,8 @@ PASS="$(jq -r '.pass // ""' "$CONFIG_PATH")"
 THREADS="$(jq -r '.threads // 0' "$CONFIG_PATH")"
 PRIO="$(jq -r '.priority // 0' "$CONFIG_PATH")"
 
-# Odstráň scheme ak niekto zadá napr. stratum+ssl://...
 POOL_CLEAN="$(echo "$POOL" | sed 's#^[a-zA-Z0-9+.-]*://##')"
 
-# Ak je pool host:port, rozdeľ
 POOL_HOST="$POOL_CLEAN"
 POOL_PORT_FROM_POOL=""
 if echo "$POOL_CLEAN" | grep -q ':'; then
@@ -21,7 +19,6 @@ if echo "$POOL_CLEAN" | grep -q ':'; then
   POOL_PORT_FROM_POOL="$(echo "$POOL_CLEAN" | awk -F: '{print $2}')"
 fi
 
-# Port: preferuj .port, inak z pool, inak default 3333
 if [ "$PORT" -gt 0 ] 2>/dev/null; then
   POOL_PORT="$PORT"
 elif [ -n "$POOL_PORT_FROM_POOL" ]; then
@@ -42,7 +39,6 @@ fi
 
 echo "[xmrig-addon] Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
 
-# MSR: nič nevytvárať cez mknod (to je zle). Len informácia.
 if [ -c /dev/cpu/0/msr ]; then
   echo "[xmrig-addon] MSR device present: /dev/cpu/0/msr"
 else
@@ -72,4 +68,3 @@ exec /usr/bin/xmrig \
   $THREAD_ARGS \
   $PRIO_ARGS \
   --randomx-mode=fast
-
