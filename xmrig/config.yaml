@@ -11,18 +11,24 @@ startup: services
 boot: auto
 init: false
 
-# aby to vedelo pool DNS a priamo sieť (ponechaj, ak to repo používa)
 host_network: true
 
-# Kľúčové pre MSR mod
-privileged:
+# DÔLEŽITÉ: privileged je boolean (nie zoznam)
+privileged: true
+
+# DÔLEŽITÉ: capability idú sem
+capabilities:
   - SYS_RAWIO
   - SYS_NICE
   - IPC_LOCK
 
-# namapuj /dev/cpu z hosta
+# Namapuj /dev/cpu z hosta
 devices:
   - /dev/cpu:/dev/cpu:rwm
+
+# Nech Supervisor pri štarte add-onu sám nahrá msr modul (ak ešte nie je)
+kernel_modules:
+  - msr
 
 map:
   - addon_config:rw
@@ -32,7 +38,7 @@ options:
   pool: "pool.supportxmr.com"
   port: 443
   user: ""
-  pass: "x"
+  pass: ""
   threads: 0
   priority: 0
 
@@ -44,5 +50,4 @@ schema:
   threads: int
   priority: int
 
-# (ak repo používa image template, nechaj; ak nie, prispôsob podľa repo)
 image: "ghcr.io/bearstorm/{arch}-ha-xmrig-addon"
