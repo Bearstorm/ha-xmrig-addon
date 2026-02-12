@@ -2,8 +2,6 @@ name: Publish XMRig addon image to GHCR
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -32,9 +30,15 @@ jobs:
 
       - name: Read version from xmrig/config.yaml
         id: vars
+        shell: bash
         run: |
-          VERSION=$(grep -E '^version:' xmrig/config.yaml | sed -E 's/version: *"?(.*)"?/\1/')
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          # vyber riadok "version:" a vyčisti úvodzovky aj medzery
+          VERSION="$(grep -E '^version:' xmrig/config.yaml | head -n1 | cut -d':' -f2- | tr -d ' "')" 
+          if [[ -z "$VERSION" ]]; then
+            echo "ERROR: VERSION is empty"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build and push (amd64)
         uses: docker/build-push-action@v6
@@ -44,4 +48,3 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/amd64-ha-xmrig-addon:${{ steps.vars.outputs.VERSION }}
             ghcr.io/${{ github.repository_owner }}/amd64-ha-xmrig-addon:latest
-
