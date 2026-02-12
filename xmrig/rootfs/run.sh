@@ -1,3 +1,5 @@
+
+
 #!/bin/sh
 set -eu
 
@@ -61,9 +63,8 @@ fi
 MSR_ARGS=""
 if [ "$MSR_MOD_ENABLED" = "false" ]; then
   echo "[xmrig-addon] MSR mod: DISABLED (msr_mod=false)"
-  # Official way to disable MSR mod in XMRig:
-  # --randomx-wrmsr=-1  => disable MSR mod completely
-  MSR_ARGS="--randomx-wrmsr=-1"
+  # Hard-disable ALL MSR handling so XMRig won't even try rdmsr/wrmsr and won't print MSR errors.
+  MSR_ARGS="--randomx-wrmsr=0 --randomx-no-rdmsr --randomx-init=0"
 else
   echo "[xmrig-addon] MSR mod: ENABLED (msr_mod=true)"
 
@@ -97,7 +98,6 @@ exec /usr/bin/xmrig \
   $PRIO_ARGS \
   $MSR_ARGS \
   --randomx-mode=fast
-
 
 
 
