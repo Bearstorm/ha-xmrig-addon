@@ -1,4 +1,3 @@
-
 #!/bin/sh
 set -eu
 
@@ -50,6 +49,7 @@ else
 fi
 
 # --- MSR SELF-TEST (container) ---
+# If rdmsr is available, verify we can read 0x1a4 from inside the container.
 if command -v rdmsr >/dev/null 2>&1; then
   echo "[xmrig-addon] MSR self-test: rdmsr 0x1a4"
   if rdmsr 0x1a4 >/dev/null 2>&1; then
@@ -84,5 +84,5 @@ exec /usr/bin/xmrig \
   $TLS_ARGS \
   $THREAD_ARGS \
   $PRIO_ARGS \
-  --no-msr \
   --randomx-mode=fast
+
