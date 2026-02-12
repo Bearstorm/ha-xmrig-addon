@@ -67,3 +67,9 @@ In Home Assistant:
     Stability: Allocating too many threads may cause lag in Frigate video processing or automation delays.
 
 Use this add-on at your own risk.
+---
+
+## 📄 License
+This project is licensed under the **Creative Commons Attribution-NoDerivs 4.0 International (CC BY-ND 4.0)**.
+- You are free to share and use this add-on.
+- You **cannot** distribute modified versions of this code.
