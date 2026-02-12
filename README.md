@@ -82,11 +82,11 @@ For Home Assistant OS (HAOS)
 
 ⚠️ Disclaimer & Risks
 
-    [!CAUTION] Security: Disabling "Protection mode" grants the add-on direct access to hardware (CPU registers). Only do this if you trust the source code.
+   [!CAUTION] Security: Disabling "Protection mode" grants the add-on direct access to hardware (CPU registers). Only do this if you trust the source code.
 
-    Temperature: Mining significantly increases CPU temperature. Expected increase is 15-25°C. Ensure your hardware has adequate cooling.
+   Temperature: Mining significantly increases CPU temperature. Expected increase is 15-25°C. Ensure your hardware has adequate cooling.
 
-    Stability: Allocating too many threads may cause lag in Frigate video processing or automation delays.
+   Stability: Allocating too many threads may cause lag in Frigate video processing or automation delays.
 
 Use this add-on at your own risk.
 
@@ -94,6 +94,6 @@ Use this add-on at your own risk.
 
 This project is licensed under the Creative Commons Attribution-NoDerivs 4.0 International (CC BY-ND 4.0).
 
-    You are free to share and use this add-on.
+   You are free to share and use this add-on.
 
-    You cannot distribute modified versions of this code.
+   You cannot distribute modified versions of this code.
