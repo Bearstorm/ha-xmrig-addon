@@ -12,6 +12,10 @@ boot: auto
 init: false
 
 host_network: true
+host_pid: true
+
+# IMPORTANT: allow raw MSR ioctls (Supervisor/AppArmor otherwise blocks MSR access)
+apparmor: false
 
 privileged:
   - SYS_RAWIO
@@ -23,7 +27,7 @@ devices:
   - /dev/cpu:/dev/cpu:rwm
 
 kernel_modules: true
-# full_access: true
+full_access: true
 
 options:
   pool: "pool.supportxmr.com"
