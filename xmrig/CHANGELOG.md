@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.21.4
+- Removed private data from default configuration
+- Added SYS_RAWIO and SYS_ADMIN privileges for MSR support
+- Optimized run.sh for cleaner pool/port handling
+- Enforced Fast RandomX mode for better hashrate
+
 ## 6.21.2
 - Added CPU thread control (choose how many cores to use)
 - Added CPU priority settings
