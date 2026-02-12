@@ -3,7 +3,7 @@
 [![Home Assistant Badge](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
 ![Architecture x86_64](https://img.shields.io/badge/Arch-x86__64%20(amd64)-orange.svg)
 
-High-performance and fully configurable Monero (XMR) mining add-on for the Home Assistant ecosystem. Optimized for **x86_64 (amd64)** architecture, specifically tuned for Intel 12th Gen processors.
+High-performance and fully configurable Monero (XMR) mining add-on for the Home Assistant ecosystem. Optimized for **x86_64 (amd64)** architecture, specifically tuned for modern Intel (10th-12th Gen) and AMD processors.
 
 ---
 
@@ -56,16 +56,22 @@ Each option in the configuration tab affects miner behavior and system resource 
 
 ## ⚡ Performance Optimization (MSR Mod)
 
-To resolve the `FAILED TO APPLY MSR MOD` error and increase performance by ~20%, you must allow access to CPU registers:
+To resolve the `FAILED TO APPLY MSR MOD` error and increase performance by ~20%, you must allow the container to access CPU registers. The steps depend on your installation type:
 
-### 1. On your Debian Host (Terminal)
-Run these commands to enable MSR support and ensure it persists after reboot:
-```bash
-sudo apt update && sudo apt install msr-tools -y
-echo "msr" | sudo tee -a /etc/modules
-sudo modprobe msr
+### For Home Assistant Supervised (Debian/Ubuntu/Generic Linux)
+You must enable the MSR module on your **host operating system**:
+1. Open your host terminal (SSH to Debian/Ubuntu).
+2. Run these commands to enable MSR and ensure it persists after reboot:
+   ```bash
+   sudo apt update && sudo apt install msr-tools -y
+   echo "msr" | sudo tee -a /etc/modules
+   sudo modprobe msr
 
-2. In Home Assistant
+---
+
+In Home Assistant: Set Protection mode to OFF in the Add-on Info tab and restart.
+
+For Home Assistant OS (HAOS)
 
     Go to Settings -> Add-ons -> XMRig Miner.
 
@@ -73,7 +79,7 @@ sudo modprobe msr
 
     Turn OFF "Protection mode".
 
-    Restart the add-on.
+    Restart the add-on. Note: Depending on the HAOS kernel version, MSR might be restricted by the OS itself.
 
 ⚠️ Disclaimer & Risks
 
