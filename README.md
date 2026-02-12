@@ -66,20 +66,19 @@ You must enable the MSR module on your **host operating system**:
    sudo apt update && sudo apt install msr-tools -y
    echo "msr" | sudo tee -a /etc/modules
    sudo modprobe msr
-
----
-
-In Home Assistant: Set Protection mode to OFF in the Add-on Info tab and restart.
+3.In Home Assistant: Set Protection mode to OFF in the Add-on Info tab and restart.
 
 For Home Assistant OS (HAOS)
 
-    Go to Settings -> Add-ons -> XMRig Miner.
+ 1.   Go to Settings -> Add-ons -> XMRig Miner.
 
-    Open the Info tab.
+ 2.   Open the Info tab.
 
-    Turn OFF "Protection mode".
+ 3.   Turn OFF "Protection mode".
 
-    Restart the add-on. Note: Depending on the HAOS kernel version, MSR might be restricted by the OS itself.
+ 4.   Restart the add-on. Note: Depending on the HAOS kernel version, MSR might be restricted by the OS itself.
+
+---
 
 ⚠️ Disclaimer & Risks
 
@@ -90,6 +89,7 @@ For Home Assistant OS (HAOS)
     Stability: Allocating too many threads may cause lag in Frigate video processing or automation delays.
 
 Use this add-on at your own risk.
+
 📄 License
 
 This project is licensed under the Creative Commons Attribution-NoDerivs 4.0 International (CC BY-ND 4.0).
