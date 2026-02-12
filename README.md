@@ -1,104 +1,141 @@
 # 🪙 XMRig Miner Add-on for Home Assistant
 
-[![Home Assistant Badge](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
-![Architecture x86_64](https://img.shields.io/badge/Arch-x86__64%20(amd64)-orange.svg)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
+![Architecture](https://img.shields.io/badge/Arch-x86__64%20(amd64)-orange.svg)
 
-High-performance and fully configurable Monero (XMR) mining add-on for the Home Assistant ecosystem. Optimized for **x86_64 (amd64)** architecture, specifically tuned for modern Intel (10th-12th Gen) and AMD processors.
+High-performance and fully configurable Monero (XMR) mining add-on for the Home Assistant ecosystem.  
+Optimized for **x86_64 (amd64)** architecture, specifically tuned for modern Intel (10th–12th Gen) and AMD processors.
+
+> ⚠️ **Important:** Versions older than **6.21.6** are not recommended due to unstable MSR handling and privilege inconsistencies.
 
 ---
 
 ## 💻 System Requirements
 
-To run this miner efficiently without impacting your Home Assistant stability, we recommend:
+To run this miner efficiently without impacting Home Assistant stability:
 
-* **Architecture:** x86_64 (Intel or AMD). **Note:** ARM devices (e.g., Raspberry Pi) are NOT supported.
-* **Minimum CPU:** 4-core processor (e.g., Intel Celeron J4125 or newer).
-* **Recommended CPU:** Intel Core i5/i7 (10th Gen+) or AMD Ryzen 5+. Higher L3 cache significantly improves hashrate.
-* **RAM:** 4GB minimum. 8GB+ recommended if running Frigate or other heavy Add-ons.
-* **Storage:** 500MB free space for the container.
-* **OS:** Home Assistant OS or Home Assistant Supervised on Debian 12.
+- **Architecture:** x86_64 (Intel or AMD)  
+  ARM devices (e.g., Raspberry Pi) are **NOT supported**
+- **Minimum CPU:** 4-core processor (Intel Celeron J4125 or newer)
+- **Recommended CPU:** Intel Core i5/i7 (10th Gen+) or AMD Ryzen 5+  
+  Higher L3 cache significantly improves hashrate
+- **RAM:** 4GB minimum (8GB+ recommended if running Frigate or heavy add-ons)
+- **Storage:** ~500MB free space
+- **OS:** Home Assistant OS or Home Assistant Supervised (Debian 12 recommended)
 
 ---
 
 ## 🚀 Features
 
-* ⚙️ **Architecture Optimized:** Specifically tuned for modern x86_64 CPUs.
-* 🏠 **Native Integration:** Runs as a standard Home Assistant service.
-* ⚖️ **Resource Management:** Uses low process priority to ensure critical services like **Frigate** or **Zigbee2MQTT** remain unaffected.
-* 🛠️ **Full Control:** Configure CPU threads and priority directly via the web interface.
+- ⚙️ Optimized for modern x86_64 CPUs
+- 🏠 Native Home Assistant integration
+- 🎛️ Adjustable CPU threads
+- ⚖️ Configurable CPU priority
+- 🔧 Built-in MSR optimization toggle
+- 🔐 Compatible with Protection Mode
 
 ---
 
 ## 📥 Installation
 
-1.  In Home Assistant, navigate to **Settings** ➡️ **Add-ons** ➡️ **Add-on Store**.
-2.  Click the **⋮** (top right) and select **Repositories**.
-3.  Add the following URL: `https://github.com/Bearstorm/ha-xmrig-addon`
-4.  Click **Add**, then **Close**.
-5.  Search for **"XMRig Miner"** and click **Install**.
+1. Go to **Settings → Add-ons → Add-on Store**
+2. Click the **⋮ menu** (top right) → **Repositories**
+3. Add:
+   ```
+   https://github.com/Bearstorm/ha-xmrig-addon
+   ```
+4. Install **XMRig Miner**
+5. Configure and start
 
 ---
 
-## ⚙️ Configuration Explained
+## ⚙️ Configuration Options
 
-Each option in the configuration tab affects miner behavior and system resource allocation:
-
-| Option | Description | System Impact |
-| :--- | :--- | :--- |
-| **`pool`** | Pool address (e.g., `pool.supportxmr.com`). | Determines where your hashing power is directed. |
-| **`port`** | Connection port (Standard `5555`, or `443` for TLS). | Port 443 with TLS enabled masks mining as standard HTTPS traffic. |
-| **`user`** | Your Monero (XMR) wallet address. | **Critical:** If the address is incorrect, you will not receive rewards. |
-| **`pass`** | Worker name (e.g., `HP_Pro_Mini`). | Used to identify your machine in pool statistics. |
-| **`threads`** | Number of allocated CPU threads. | **Performance:** Higher value = higher hashrate. Keep at least 2 threads free for the OS. |
-| **`priority`** | CPU scheduling priority (0 to 5). | **2 (Recommended):** Ensures system stability while maintaining mining performance. |
-
----
-
-## ⚡ Performance Optimization (MSR Mod)
-
-To resolve the `FAILED TO APPLY MSR MOD` error and increase performance by ~20%, you must allow the container to access CPU registers. The steps depend on your installation type:
-
-### For Home Assistant Supervised (Debian/Ubuntu/Generic Linux)
-You must enable the MSR module on your **host operating system**:
-1. Open your host terminal (SSH to Debian/Ubuntu).
-2. Run these commands to enable MSR and ensure it persists after reboot:
-   ```bash
-   sudo apt update && sudo apt install msr-tools -y
-   echo "msr" | sudo tee -a /etc/modules
-   sudo modprobe msr
-3.In Home Assistant: Set Protection mode to OFF in the Add-on Info tab and restart.
-
-For Home Assistant OS (HAOS)
-
- 1.   Go to Settings -> Add-ons -> XMRig Miner.
-
- 2.   Open the Info tab.
-
- 3.   Turn OFF "Protection mode".
-
- 4.   Restart the add-on. Note: Depending on the HAOS kernel version, MSR might be restricted by the OS itself.
+| Option | Description | Impact |
+|--------|------------|--------|
+| `pool` | Mining pool address | Where hashing power is directed |
+| `port` | Pool port (443 recommended) | Enables TLS |
+| `wallet` | Your XMR wallet address | Required for payouts |
+| `worker` | Worker name | Visible in pool stats |
+| `threads` | CPU threads to use | Higher = higher hashrate |
+| `priority` | CPU priority (0–5) | 2 recommended |
+| `msr_mod` | Enable MSR optimization | +Performance if supported |
 
 ---
 
-⚠️ Disclaimer & Risks
+# ⚡ MSR Optimization (Advanced)
 
-   [!CAUTION] Security: Disabling "Protection mode" grants the add-on direct access to hardware (CPU registers). Only do this if you trust the source code.
+MSR (Model Specific Register) tuning can increase RandomX performance by up to ~20% on supported Intel CPUs.
 
-   Temperature: Mining significantly increases CPU temperature. Expected increase is 15-25°C. Ensure your hardware has adequate cooling.
+## 🔄 Built-in MSR Toggle
 
-   Stability: Allocating too many threads may cause lag in Frigate video processing or automation delays.
+From version **6.21.6+**, MSR optimization can be enabled or disabled directly:
 
-Use this add-on at your own risk.
+| Setting | Behavior |
+|----------|----------|
+| `msr_mod: true` | Enables MSR optimization |
+| `msr_mod: false` | Disables MSR optimization completely |
+
+If disabled, XMRig runs normally without MSR tuning (slightly lower hashrate, maximum stability).
 
 ---
 
-📄 License
+## 🖥️ Home Assistant Supervised (Debian Host)
 
-This project is licensed under the Creative Commons Attribution-NoDerivs 4.0 International (CC BY-ND 4.0).
+MSR must be enabled on the **host system** (not inside the container):
 
-   You are free to share and use this add-on.
+```bash
+sudo apt update
+sudo apt install msr-tools -y
+echo "msr" | sudo tee -a /etc/modules
+sudo modprobe msr
+```
 
-   You cannot distribute modified versions of this code.
+Then in Home Assistant:
+
+1. Open the add-on  
+2. Go to the **Info** tab  
+3. Disable **Protection Mode**  
+4. Restart the add-on  
+5. Enable `msr_mod` in **Configuration**
+
+---
+
+## 🧩 Home Assistant OS (HAOS)
+
+1. Open the add-on  
+2. Go to the **Info** tab  
+3. Disable **Protection Mode**  
+4. Restart the add-on  
+5. Enable `msr_mod` in **Configuration**
+
+> ℹ️ Some HAOS kernel or security configurations may restrict MSR access even with Protection Mode disabled.
+
+---
+
+# 🔒 Protection Mode Explained
+
+- **Enabled:** Maximum security, MSR access blocked  
+- **Disabled:** Required for MSR optimization  
+- Safe to keep enabled if `msr_mod: false`
+
+---
+
+# ⚠️ Disclaimer & Risks
+
+- Disabling Protection Mode grants hardware-level access  
+- Mining increases CPU temperature (+15–25°C typical)  
+- Leave at least 2 threads free for system stability  
+- Use at your own risk
+
+---
+
+# 📄 License
+
+Creative Commons Attribution-NoDerivs 4.0 International (CC BY-ND 4.0)
+
+You may share and use this add-on.  
+Modified versions may not be redistributed.
 
 ---
 
