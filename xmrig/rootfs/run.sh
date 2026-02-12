@@ -1,5 +1,5 @@
-#!/bin/bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 CONFIG_PATH="/data/options.json"
 
@@ -43,60 +43,61 @@ echo "[xmrig-addon] Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
 echo "[xmrig-addon] Wallet: ${WALLET}"
 echo "[xmrig-addon] Worker: ${WORKER}"
 
-if [ -c /dev/cpu/0/msr ]; then
-  echo "[xmrig-addon] MSR device present: /dev/cpu/0/msr"
-else
-  echo "[xmrig-addon] WARNING: MSR device missing: /dev/cpu/0/msr"
-fi
-
-# --- MSR SELF-TEST (container) ---
-if command -v rdmsr >/dev/null 2>&1; then
-  echo "[xmrig-addon] MSR self-test: rdmsr 0x1a4"
-  if rdmsr 0x1a4 >/dev/null 2>&1; then
-    echo "[xmrig-addon] MSR self-test: OK"
-  else
-    echo "[xmrig-addon] MSR self-test: FAIL (rdmsr cannot read 0x1a4 inside container)"
-  fi
-else
-  echo "[xmrig-addon] MSR self-test: rdmsr not installed (skipping)"
-fi
-# --- /MSR SELF-TEST ---
-
-TLS_ARGS=()
+TLS_ARGS=""
 if [ "$POOL_PORT" = "443" ]; then
-  TLS_ARGS+=(--tls)
+  TLS_ARGS="--tls"
 fi
 
-THREAD_ARGS=()
+THREAD_ARGS=""
 if [ "$THREADS" -gt 0 ] 2>/dev/null; then
-  THREAD_ARGS+=(--threads="${THREADS}")
+  THREAD_ARGS="--threads=${THREADS}"
 fi
 
-PRIO_ARGS=()
+PRIO_ARGS=""
 if [ "$PRIO" -gt 0 ] 2>/dev/null; then
-  PRIO_ARGS+=(--cpu-priority="${PRIO}")
+  PRIO_ARGS="--cpu-priority=${PRIO}"
 fi
 
-# MSR mod toggle (variant B):
-# - true  => default behavior (XMRig tries MSR mod)
-# - false => disable MSR mod cleanly (no screaming, but no boost)
-MSR_ARGS=()
+MSR_ARGS=""
 if [ "$MSR_MOD_ENABLED" = "false" ]; then
-  echo "[xmrig-addon] MSR mod: DISABLED by user option (msr_mod=false)"
-  MSR_ARGS+=(--randomx-wrmsr=-1 --randomx-no-rdmsr)
+  echo "[xmrig-addon] MSR mod: DISABLED (msr_mod=false)"
+  # Official way to disable MSR mod in XMRig:
+  # --randomx-wrmsr=-1  => disable MSR mod completely
+  MSR_ARGS="--randomx-wrmsr=-1"
 else
   echo "[xmrig-addon] MSR mod: ENABLED (msr_mod=true)"
+
+  if [ -c /dev/cpu/0/msr ]; then
+    echo "[xmrig-addon] MSR device present: /dev/cpu/0/msr"
+  else
+    echo "[xmrig-addon] WARNING: MSR device missing: /dev/cpu/0/msr"
+  fi
+
+  # --- MSR SELF-TEST (container) ---
+  # Only when MSR mod is enabled.
+  if command -v rdmsr >/dev/null 2>&1; then
+    echo "[xmrig-addon] MSR self-test: rdmsr 0x1a4"
+    if rdmsr 0x1a4 >/dev/null 2>&1; then
+      echo "[xmrig-addon] MSR self-test: OK"
+    else
+      echo "[xmrig-addon] MSR self-test: FAIL (rdmsr cannot read 0x1a4 inside container)"
+    fi
+  else
+    echo "[xmrig-addon] MSR self-test: rdmsr not installed (skipping)"
+  fi
+  # --- /MSR SELF-TEST ---
 fi
 
 exec /usr/bin/xmrig \
   --url "${POOL_HOST}:${POOL_PORT}" \
   --user "$WALLET" \
   --pass "$WORKER" \
-  "${TLS_ARGS[@]}" \
-  "${THREAD_ARGS[@]}" \
-  "${PRIO_ARGS[@]}" \
-  "${MSR_ARGS[@]}" \
+  $TLS_ARGS \
+  $THREAD_ARGS \
+  $PRIO_ARGS \
+  $MSR_ARGS \
   --randomx-mode=fast
+
 
 
 
