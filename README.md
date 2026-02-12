@@ -48,3 +48,22 @@ To resolve the `FAILED TO APPLY MSR MOD` error and increase performance by ~20%,
    ```bash
    sudo apt update && sudo apt install msr-tools -y
    sudo modprobe msr
+In Home Assistant:
+
+        Go to Settings -> Add-ons -> XMRig Miner.
+
+        Open the Info tab.
+
+        Turn OFF "Protection mode".
+
+        Restart the add-on.
+
+⚠️ Disclaimer & Risks
+
+    Security: Disabling "Protection mode" grants the add-on direct access to hardware (CPU registers). Only do this if you trust the source code.
+
+    Temperature: Mining significantly increases CPU temperature. Ensure your hardware has adequate cooling.
+
+    Stability: Allocating too many threads may cause lag in Frigate video processing or automation delays.
+
+Use this add-on at your own risk.
