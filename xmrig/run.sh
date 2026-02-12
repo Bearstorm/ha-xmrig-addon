@@ -1,10 +1,11 @@
-#!/usr/bin/with-contenv bashio
+#!/bin/sh
 
-POOL=$(bashio::config 'pool')
-USER=$(bashio::config 'user')
-PASS=$(bashio::config 'pass')
+CONFIG_PATH=/data/options.json
 
-bashio::log.info "Starting Bearstorm Miner on pool: ${POOL}"
+POOL=$(grep -o '"pool": "[^"]*' $CONFIG_PATH | cut -d'"' -f4)
+USER=$(grep -o '"user": "[^"]*' $CONFIG_PATH | cut -d'"' -f4)
+PASS=$(grep -o '"pass": "[^"]*' $CONFIG_PATH | cut -d'"' -f4)
 
-# Pridanie 'exec' zabezpečí, že xmrig prevezme PID od skriptu a stane sa hlavným procesom
+echo "Starting XMRig on pool: $POOL"
+
 exec /usr/bin/xmrig --url "$POOL" --user "$USER" --pass "$PASS"
