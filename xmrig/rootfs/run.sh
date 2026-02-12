@@ -1,3 +1,4 @@
+
 #!/bin/sh
 set -eu
 
@@ -14,6 +15,7 @@ POOL_CLEAN="$(echo "$POOL" | sed 's#^[a-zA-Z0-9+.-]*://##')"
 
 POOL_HOST="$POOL_CLEAN"
 POOL_PORT_FROM_POOL=""
+
 if echo "$POOL_CLEAN" | grep -q ':'; then
   POOL_HOST="$(echo "$POOL_CLEAN" | awk -F: '{print $1}')"
   POOL_PORT_FROM_POOL="$(echo "$POOL_CLEAN" | awk -F: '{print $2}')"
@@ -38,6 +40,8 @@ if [ -z "$WALLET" ]; then
 fi
 
 echo "[xmrig-addon] Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
+echo "[xmrig-addon] Wallet: ${WALLET}"
+echo "[xmrig-addon] Worker: ${WORKER}"
 
 if [ -c /dev/cpu/0/msr ]; then
   echo "[xmrig-addon] MSR device present: /dev/cpu/0/msr"
