@@ -14,7 +14,7 @@ init: false
 host_network: true
 host_pid: true
 
-# IMPORTANT: allow raw MSR ioctls (Supervisor/AppArmor otherwise blocks MSR access)
+# DÔLEŽITÉ: pri MSR zápise to často blokuje AppArmor profil
 apparmor: false
 
 privileged:
@@ -34,8 +34,11 @@ options:
   port: 443
   wallet: ""
   worker: "HA"
-  threads: 1
+  threads: 0
   priority: 2
+
+  # Varianta B: užívateľ si prepne MSR mod sám
+  msr_mod: true
 
 schema:
   pool: str
@@ -44,6 +47,7 @@ schema:
   worker: str
   threads: int
   priority: int
+  msr_mod: bool
 
 
 
