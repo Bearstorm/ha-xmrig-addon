@@ -1,7 +1,8 @@
+
 name: XMRig Miner
 slug: xmrig
 description: High-performance Monero miner with CPU and thread control.
-version: "6.21.0"
+version: "6.21.4"
 url: "https://github.com/Bearstorm/ha-xmrig-addon"
 
 arch:
@@ -13,22 +14,19 @@ init: false
 
 host_network: true
 
-# Dôležité: boolean
-privileged: true
-
-# Dôležité: capabilities sem
-capabilities:
+# Toto je v HA add-onoch zoznam capability (nie boolean)
+privileged:
   - SYS_RAWIO
   - SYS_NICE
   - IPC_LOCK
 
-# namapuj /dev/cpu z hosta
+# POZOR: devices je iba zoznam ciest z hosta (nie /host:/container:rwm)
 devices:
-  - /dev/cpu:/dev/cpu:rwm
+  - /dev/cpu
 
-# nech supervisor skúsi natiahnuť msr modul
-kernel_modules:
-  - msr
+# kernel_modules je BOOL (ak dáš true, namapuje moduly/config a pridá SYS_MODULE)
+# Pri MSR to nie je nutné, ale neškodí.
+kernel_modules: true
 
 map:
   - addon_config:rw
@@ -49,3 +47,5 @@ schema:
   pass: str
   threads: int
   priority: int
+
+image: "ghcr.io/bearstorm/{arch}-ha-xmrig-addon"
