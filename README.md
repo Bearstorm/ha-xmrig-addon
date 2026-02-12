@@ -1,47 +1,36 @@
-XMRig Miner Add-on for Home Assistant
+🪙 XMRig Miner Add-on for Home Assistant
 
-This is a custom Home Assistant add-on for running XMRig, a high-performance Monero (XMR) miner, directly on your Home Assistant Supervised or OS installation.
-Features
+A high-performance custom add-on to run XMRig (Monero miner) directly within your Home Assistant ecosystem. Optimized for stability and system longevity.
+🚀 Features
 
-    Architecture Optimized: Specifically built and tested for x86_64 (amd64) systems.
+    ⚙️ Architecture Optimized: Specifically tuned for x86_64 (amd64) processors.
 
-    Background Operation: Runs as a native Home Assistant service.
+    🏠 Native Integration: Runs as a standard Home Assistant service.
 
-    Resource Management: Set with low process priority (nice -n 15) to ensure Home Assistant core and add-ons (like Frigate) maintain peak performance.
+    ⚖️ Smart Resource Management: Uses low process priority (nice -n 15) to ensure Frigate, Zigbee2MQTT, and the Core always have priority.
 
-    Easy Configuration: Manage your pool and wallet directly through the Home Assistant UI.
+    🛠️ Simple Web UI Config: No terminal needed for basic settings.
 
-Installation
+📥 Installation
 
-    Go to your Home Assistant instance.
+    Open your Home Assistant dashboard.
 
-    Navigate to Settings -> Add-ons -> Add-on Store.
+    Go to Settings ➡️ Add-ons ➡️ Add-on Store.
 
-    Click the three dots in the top right corner and select Repositories.
+    Click the ⋮ (top right) and select Repositories.
 
-    Add the following URL: https://github.com/Bearstorm/ha-xmrig-addon
+    Add this URL:
 
-    Click Add and then Close.
+    https://github.com/Bearstorm/ha-xmrig-addon
 
-    Find the XMRig Miner in the store (under the "Bearstorm Addons" section).
+    Click Add, then Close.
 
-    Click Install.
+    Search for "XMRig Miner" in the store and click Install.
 
-Configuration
+🔧 Configuration
 
-Once installed, navigate to the Configuration tab of the add-on and set your mining details:
-YAML
+Add your mining details in the Configuration tab:
 
-pool: "Your preferred Monero mining pool"
-user: "Your XMR wallet address."
-pass: "Worker name (identifier for your machine)"
-
-    pool: Your preferred Monero mining pool.
-
-    user: Your XMR wallet address.
-
-    pass: Worker name (identifier for your machine).
-
-Disclaimer
-
-Mining cryptocurrency increases power consumption and generates heat. Use this add-on at your own risk.
+pool: "Your XMR mining pool address"
+user: "Your Monero (XMR) wallet address"
+pass: "Worker identifier (name for this machine)"
