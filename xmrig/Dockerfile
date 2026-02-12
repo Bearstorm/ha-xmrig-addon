@@ -7,7 +7,9 @@ RUN wget https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-l
     && mv xmrig-6.21.0/xmrig /usr/bin/xmrig \
     && rm -rf xmrig-6.21.0* xmrig-6.21.0-linux-static-x64.tar.gz
 
-COPY run.sh /
+# HA add-on štýl: všetko runtime ide z rootfs
+COPY rootfs/ /
+
 RUN chmod a+x /run.sh
 
 ENTRYPOINT ["/bin/sh", "/run.sh"]
