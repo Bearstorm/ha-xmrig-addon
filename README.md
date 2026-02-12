@@ -32,9 +32,9 @@ Configuration
 Once installed, navigate to the Configuration tab of the add-on and set your mining details:
 YAML
 
-pool: "pool.supportxmr.com:443"
-user: "44tR4n25mvaYJgcMSuGsSd37fUYA4brgR7WaNskXAcZYF97jucuKTqkCsFsrid6SvY4v8fFfV22xFTmyzW7zN9oDSXXzViS"
-pass: "node_01"
+pool: "Your preferred Monero mining pool"
+user: "Your XMR wallet address."
+pass: "Worker name (identifier for your machine)"
 
     pool: Your preferred Monero mining pool.
 
