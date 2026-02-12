@@ -6,5 +6,5 @@ PASS=$(bashio::config 'pass')
 
 bashio::log.info "Starting Bearstorm Miner on pool: ${POOL}"
 
-# Nice -n 15 ensures Home Assistant has priority over mining
-nice -n 15 /usr/bin/xmrig --url "$POOL" --user "$USER" --pass "$PASS"
+# Pridanie 'exec' zabezpečí, že xmrig prevezme PID od skriptu a stane sa hlavným procesom
+exec /usr/bin/xmrig --url "$POOL" --user "$USER" --pass "$PASS"
