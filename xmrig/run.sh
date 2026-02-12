@@ -6,8 +6,9 @@ POOL=$(grep -o '"pool": "[^"]*' $CONFIG_PATH | cut -d'"' -f4)
 PORT=$(grep -o '"port": "[^"]*' $CONFIG_PATH | cut -d'"' -f4)
 USER=$(grep -o '"user": "[^"]*' $CONFIG_PATH | cut -d'"' -f4)
 PASS=$(grep -o '"pass": "[^"]*' $CONFIG_PATH | cut -d'"' -f4)
+THREADS=$(grep -o '"threads": [0-9]*' $CONFIG_PATH | cut -d' ' -f2)
+PRIO=$(grep -o '"priority": [0-9]*' $CONFIG_PATH | cut -d' ' -f2)
 
-echo "Starting XMRig on: ${POOL}:${PORT} with TLS enabled"
+echo "Starting XMRig on ${POOL}:${PORT} with ${THREADS} threads (Priority: ${PRIO})"
 
-# Vynútené TLS (SSL) spojenie, ktoré port 443 vyžaduje
-exec /usr/bin/xmrig --url "${POOL}:${PORT}" --user "$USER" --pass "$PASS" --tls
+exec /usr/bin/xmrig --url "${POOL}:${PORT}" --user "$USER" --pass "$PASS" --tls --threads="${THREADS}" --cpu-priority="${PRIO}"
