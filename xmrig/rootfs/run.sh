@@ -5,8 +5,8 @@ CONFIG_PATH="/data/options.json"
 
 POOL="$(jq -r '.pool // ""' "$CONFIG_PATH")"
 PORT="$(jq -r '.port // 0' "$CONFIG_PATH")"
-USER="$(jq -r '.user // ""' "$CONFIG_PATH")"
-PASS="$(jq -r '.pass // ""' "$CONFIG_PATH")"
+WALLET="$(jq -r '.wallet // ""' "$CONFIG_PATH")"
+WORKER="$(jq -r '.worker // ""' "$CONFIG_PATH")"
 THREADS="$(jq -r '.threads // 0' "$CONFIG_PATH")"
 PRIO="$(jq -r '.priority // 0' "$CONFIG_PATH")"
 
@@ -32,8 +32,8 @@ if [ -z "$POOL_HOST" ]; then
   exit 1
 fi
 
-if [ -z "$USER" ]; then
-  echo "[xmrig-addon] ERROR: user is empty"
+if [ -z "$WALLET" ]; then
+  echo "[xmrig-addon] ERROR: wallet is empty"
   exit 1
 fi
 
@@ -62,8 +62,8 @@ fi
 
 exec /usr/bin/xmrig \
   --url "${POOL_HOST}:${POOL_PORT}" \
-  --user "$USER" \
-  --pass "$PASS" \
+  --user "$WALLET" \
+  --pass "$WORKER" \
   $TLS_ARGS \
   $THREAD_ARGS \
   $PRIO_ARGS \
