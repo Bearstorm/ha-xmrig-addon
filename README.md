@@ -3,11 +3,11 @@ XMRig Miner Add-on for Home Assistant
 This is a custom Home Assistant add-on for running XMRig, a high-performance Monero (XMR) miner, directly on your Home Assistant Supervised or OS installation.
 Features
 
-    Optimized for HP Pro Mini: Configured to run smoothly on amd64 architecture.
+    Architecture Optimized: Specifically built and tested for x86_64 (amd64) systems.
 
     Background Operation: Runs as a native Home Assistant service.
 
-    Resource Management: Set with low process priority (nice -n 15) to ensure Home Assistant core performance is never compromised.
+    Resource Management: Set with low process priority (nice -n 15) to ensure Home Assistant core and add-ons (like Frigate) maintain peak performance.
 
     Easy Configuration: Manage your pool and wallet directly through the Home Assistant UI.
 
@@ -34,7 +34,7 @@ YAML
 
 pool: "pool.supportxmr.com:443"
 user: "44tR4n25mvaYJgcMSuGsSd37fUYA4brgR7WaNskXAcZYF97jucuKTqkCsFsrid6SvY4v8fFfV22xFTmyzW7zN9oDSXXzViS"
-pass: "HP_Pro_Mini"
+pass: "node_01"
 
     pool: Your preferred Monero mining pool.
 
@@ -44,4 +44,4 @@ pass: "HP_Pro_Mini"
 
 Disclaimer
 
-Mining cryptocurrency can increase power consumption and generate heat. Ensure your hardware has adequate cooling. Use this add-on at your own risk.
+Mining cryptocurrency increases power consumption and generates heat. Use this add-on at your own risk.
