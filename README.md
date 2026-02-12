@@ -216,9 +216,9 @@ Please ensure:
 
 ## 📄 License
 
-Creative Commons Attribution-NoDerivs 4.0 International (CC BY-ND 4.0)
+This project is licensed under the MIT License.  
+See the [LICENSE](LICENSE) file for details.
 
-Modified distributions are not permitted.
 
 
 ---
