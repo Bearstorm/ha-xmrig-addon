@@ -13,13 +13,12 @@ init: false
 
 host_network: true
 
-# Dôležité capabilities pre MSR + randomx / priority
+
 privileged:
   - SYS_RAWIO
   - SYS_NICE
   - IPC_LOCK
 
-# Dôležité: explicitne bindni /dev/cpu ako rwm
 devices:
   - /dev/cpu:/dev/cpu:rwm
 
