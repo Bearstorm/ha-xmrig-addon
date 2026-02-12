@@ -1,28 +1,60 @@
-name: "XMRig Miner"
+name: XMRig Miner
+slug: xmrig
+description: High-performance Monero miner with CPU and thread control.
 version: "6.21.4"
-slug: "xmrig"
-description: "High-performance Monero miner with CPU and thread control"
+url: "https://github.com/Bearstorm/ha-xmrig-addon"
 arch:
   - amd64
+
 startup: services
 boot: auto
-full_access: true
+init: false
+
 host_network: true
+
+
 privileged:
   - SYS_RAWIO
-  - SYS_ADMIN
-  - DAC_READ_SEARCH
+  - SYS_NICE
+  - IPC_LOCK
+
+devices:
+  - /dev/cpu:/dev/cpu:rwm
+
+map:
+  - addon_config:rw
+  - share:rw
+
 options:
-  pool: "pool.supportxmr.com"
-  port: "443"
-  user: "YOUR_XMR_WALLET_ADDRESS"
-  pass: "node_01"
-  threads: 6
-  priority: 2
+  pool: "pool.supportxmr.com:443"
+  user: ""
+  pass: "debianha"
+  tls: true
+  algo: "rx/0"
+  threads: 0
+  donate: 1
+  http_enabled: true
+  http_host: "0.0.0.0"
+  http_port: 18088
+  http_access_token: ""
+  http_restricted: true
+  log_level: "info"
+
 schema:
   pool: str
-  port: str
   user: str
   pass: str
+  tls: bool
+  algo: str
   threads: int
-  priority: int
+  donate: int
+  http_enabled: bool
+  http_host: str
+  http_port: int
+  http_access_token: str?
+  http_restricted: bool
+  log_level: list(trace|debug|info|notice|warning|error|fatal)
+
+image: "ghcr.io/bearstorm/{arch}-ha-xmrig-addon"
+
+
