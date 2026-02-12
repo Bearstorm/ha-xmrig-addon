@@ -1,7 +1,7 @@
 name: "XMRig Miner"
 version: "6.21.2"
 slug: "xmrig"
-description: "High-performance Monero miner with CPU control"
+description: "High-performance Monero miner with CPU and thread control"
 arch:
   - amd64
 startup: services
