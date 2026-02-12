@@ -1,6 +1,10 @@
 # Changelog
 
-# Changelog
+## 6.21.7
+- Switched base image to Debian (bookworm) to reliably install msr-tools via apt
+- Added kmod (modprobe) inside container to avoid MSR module detection issues
+- Added msr_mod toggle to let user enable/disable MSR mod from UI (variant B)
+- Kept MSR self-test (rdmsr 0x1a4) for real validation inside container
 
 ## 6.21.6
 - Added optional MSR mod toggle (msr_mod) so user can enable/disable MSR optimization
