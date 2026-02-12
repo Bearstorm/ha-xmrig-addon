@@ -4,7 +4,19 @@
 ![Architecture x86_64](https://img.shields.io/badge/Arch-x86__64%20(amd64)-orange.svg)
 
 High-performance and fully configurable Monero (XMR) mining add-on for the Home Assistant ecosystem. Optimized for **x86_64 (amd64)** architecture, specifically tuned for Intel 12th Gen processors.
+---
 
+## 💻 System Requirements
+
+To run this miner efficiently without crashing your Home Assistant, we recommend:
+
+* **Minimum CPU:** 4-core x86_64 processor (e.g., Intel Celeron J4125 or newer).
+* **Recommended CPU:** Intel Core i5/i7 (10th Gen+) or AMD Ryzen 5+. Higher L3 cache significantly improves hashrate.
+* **RAM:** 4GB minimum. 8GB+ recommended if running Frigate or other heavy Add-ons.
+* **Storage:** 500MB free space for the container.
+* **OS:** Home Assistant OS or Home Assistant Supervised on Debian 12.
+
+**Note for Raspberry Pi users:** This add-on is compiled for **amd64** only. It will not work on Raspberry Pi (ARM).
 ---
 
 ### 🚀 Features
