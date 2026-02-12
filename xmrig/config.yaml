@@ -34,7 +34,7 @@ options:
   port: 443
   wallet: ""
   worker: "HA"
-  threads: 0
+  threads: 1
   priority: 2
 
 schema:
