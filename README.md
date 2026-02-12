@@ -8,7 +8,8 @@
 ![RandomX Optimized](https://img.shields.io/badge/RandomX-Optimized-red.svg)
 
 ![Build Status](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/publish.yml/badge.svg)
-![GHCR](https://img.shields.io/badge/GHCR-Available-blue)
+![GHCR Pulls](https://img.shields.io/docker/pulls/bearstorm/ha-xmrig-addon?label=GHCR%20Pulls)
+
 
 
 High-performance and fully configurable **Monero (XMR)** mining add-on for Home Assistant.  
