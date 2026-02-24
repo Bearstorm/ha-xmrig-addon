@@ -11,9 +11,9 @@ permissions:
   packages: write
 
 jobs:
-  # JOB 1: SUPERVISED VERZIA
   build-amd64-supervised:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,23 +28,40 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image owner
+      - name: Compute image owner (lowercase)
         id: owner
-        run: echo "OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          OWNER_LC="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push (Supervised)
+      - name: Read and sanitize version from xmrig/config.yaml
+        id: vars
+        shell: bash
+        run: |
+          RAW_LINE="$(grep -E '^version:' xmrig/config.yaml | head -n1)"
+          VERSION="$(echo "$RAW_LINE" | cut -d':' -f2- | tr -d '\r\n' | tr -d ' "')"
+          if [[ -z "$VERSION" ]]; then
+            echo "ERROR: VERSION is empty. RAW_LINE=$RAW_LINE"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Parsed VERSION=$VERSION"
+
+      - name: Build and push (amd64 - supervised/msr)
         uses: docker/build-push-action@v6
         with:
-          # TU POZOR: Priečinok sa musí volať presne takto v tvojom githube
-          context: ./xmrig_supervised
+          context: ./xmrig
           push: true
           tags: |
+            ghcr.io/${{ steps.owner.outputs.OWNER_LC }}/amd64-ha-xmrig-addon:${{ steps.vars.outputs.VERSION }}
             ghcr.io/${{ steps.owner.outputs.OWNER_LC }}/amd64-ha-xmrig-addon:latest
 
-  # JOB 2: HAOS SAFE VERZIA
   build-amd64-haos:
     runs-on: ubuntu-latest
-    # Odstránil som "needs", aby sa buildy spúšťali nezávisle (ak jeden zlyhá, druhý môže prejsť)
+    needs: build-amd64-supervised
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,15 +76,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image owner
+      - name: Compute image owner (lowercase)
         id: owner
-        run: echo "OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          OWNER_LC="$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push (HAOS Safe)
+      - name: Read and sanitize version from xmrig_haos/config.yaml
+        id: vars
+        shell: bash
+        run: |
+          RAW_LINE="$(grep -E '^version:' xmrig_haos/config.yaml | head -n1)"
+          VERSION="$(echo "$RAW_LINE" | cut -d':' -f2- | tr -d '\r\n' | tr -d ' "')"
+          if [[ -z "$VERSION" ]]; then
+            echo "ERROR: VERSION is empty. RAW_LINE=$RAW_LINE"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Parsed VERSION=$VERSION"
+
+      - name: Build and push (amd64 - haos safe)
         uses: docker/build-push-action@v6
         with:
-          # TU POZOR: Priečinok sa musí volať presne takto
           context: ./xmrig_haos
           push: true
           tags: |
+            ghcr.io/${{ steps.owner.outputs.OWNER_LC }}/amd64-ha-xmrig-addon-haos:${{ steps.vars.outputs.VERSION }}
             ghcr.io/${{ steps.owner.outputs.OWNER_LC }}/amd64-ha-xmrig-addon-haos:latest
+
