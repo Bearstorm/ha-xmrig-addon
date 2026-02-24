@@ -2,8 +2,6 @@ name: Publish XMRig addon image to GHCR
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -44,7 +42,7 @@ jobs:
         run: |
           RAW_LINE="$(grep -E '^version:' xmrig/config.yaml | head -n1)"
           # zober všetko za "version:" a vyhoď úvodzovky, medzery, CR/LF
-          VERSION="$(echo "$RAW_LINE" | cut -d':' -f2- | tr -d '\r\n' | tr -d ' "')" 
+          VERSION="$(echo "$RAW_LINE" | cut -d':' -f2- | tr -d '\r\n' | tr -d ' "')"
           if [[ -z "$VERSION" ]]; then
             echo "ERROR: VERSION is empty. RAW_LINE=$RAW_LINE"
             exit 1
