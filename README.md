@@ -23,6 +23,16 @@ Optimized for **x86_64 (amd64)** architecture and tuned for modern Intel (10th�
 
 ---
 
+## ⚠ Platform Support Clarification
+
+This add-on requires elevated privileges for MSR optimization.
+
+- ✅ **Primary supported platform:** Debian 12 + Home Assistant Supervised
+- ⚠ **HAOS:** Supported with limitations. Protection Mode must be disabled and kernel security policies may still block MSR access.
+- ❌ ARM architectures are not supported.
+
+---
+
 ## 📑 Table of Contents
 
 - [System Requirements](#-system-requirements)
