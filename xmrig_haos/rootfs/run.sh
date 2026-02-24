@@ -1,4 +1,3 @@
-
 #!/bin/sh
 set -eu
 
@@ -11,7 +10,25 @@ WORKER="$(jq -r '.worker // ""' "$CONFIG_PATH")"
 THREADS="$(jq -r '.threads // 0' "$CONFIG_PATH")"
 PRIO="$(jq -r '.priority // 0' "$CONFIG_PATH")"
 
-if [ -z "$POOL" ]; then
+POOL_CLEAN="$(echo "$POOL" | sed 's#^[a-zA-Z0-9+.-]*://##')"
+
+POOL_HOST="$POOL_CLEAN"
+POOL_PORT_FROM_POOL=""
+
+if echo "$POOL_CLEAN" | grep -q ':'; then
+  POOL_HOST="$(echo "$POOL_CLEAN" | awk -F: '{print $1}')"
+  POOL_PORT_FROM_POOL="$(echo "$POOL_CLEAN" | awk -F: '{print $2}')"
+fi
+
+if [ "$PORT" -gt 0 ] 2>/dev/null; then
+  POOL_PORT="$PORT"
+elif [ -n "$POOL_PORT_FROM_POOL" ]; then
+  POOL_PORT="$POOL_PORT_FROM_POOL"
+else
+  POOL_PORT="3333"
+fi
+
+if [ -z "$POOL_HOST" ]; then
   echo "[xmrig-haos] ERROR: pool is empty"
   exit 1
 fi
@@ -21,17 +38,33 @@ if [ -z "$WALLET" ]; then
   exit 1
 fi
 
-echo "[xmrig-haos] Starting SAFE XMRig (no MSR, no host access)"
-echo "[xmrig-haos] Pool: ${POOL}:${PORT}"
+echo "[xmrig-haos] Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
+echo "[xmrig-haos] Wallet: ${WALLET}"
 echo "[xmrig-haos] Worker: ${WORKER}"
+echo "[xmrig-haos] Mode: HAOS Safe (no MSR, no host privileges)"
+
+TLS_ARGS=""
+if [ "$POOL_PORT" = "443" ]; then
+  TLS_ARGS="--tls"
+fi
+
+THREAD_ARGS=""
+if [ "$THREADS" -gt 0 ] 2>/dev/null; then
+  THREAD_ARGS="--threads=${THREADS}"
+fi
+
+PRIO_ARGS=""
+if [ "$PRIO" -gt 0 ] 2>/dev/null; then
+  PRIO_ARGS="--cpu-priority=${PRIO}"
+fi
 
 exec /usr/bin/xmrig \
-  --url "${POOL}:${PORT}" \
+  --url "${POOL_HOST}:${POOL_PORT}" \
   --user "$WALLET" \
   --pass "$WORKER" \
-  --threads="$THREADS" \
-  --cpu-priority="$PRIO" \
+  $TLS_ARGS \
+  $THREAD_ARGS \
+  $PRIO_ARGS \
   --randomx-mode=fast \
   --randomx-wrmsr=0 \
-  --randomx-no-rdmsr \
-  --randomx-init=0
+  --randomx-no-rdmsr
