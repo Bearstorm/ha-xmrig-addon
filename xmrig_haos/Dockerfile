@@ -2,7 +2,7 @@ FROM ghcr.io/home-assistant/amd64-base-debian:bookworm
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# 1. Inštalácia potrebných nástrojov
+# 1. Inštalácia potrebných balíkov
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -12,31 +12,25 @@ RUN set -eux; \
       jq; \
     rm -rf /var/lib/apt/lists/*
 
-# 2. Skopírujeme config.yaml do dočasného priečinka, aby sme z neho vytiahli verziu
-COPY config.yaml /tmp/addon-config.yaml
+# 2. Nastavenie verzie napevno (najistejšia cesta)
+# Použijeme verziu 6.22.2, ktorá je aktuálna a má správne linky
+ENV XMRIG_VERSION=6.22.2
 
-# 3. Extrakcia verzie a inštalácia XMRig
+# 3. Stiahnutie a inštalácia
 RUN set -eux; \
-    # Tento príkaz vytiahne "6.21.7" zo súboru config.yaml
-    VERSION=$(grep -E '^version:' /tmp/addon-config.yaml | head -n1 | cut -d':' -f2- | tr -d '\r\n" '); \
+    echo "Sťahujem XMRig verziu: v${XMRIG_VERSION}"; \
     \
-    if [[ -z "$VERSION" ]]; then \
-      echo "ERROR: Verziu sa nepodarilo načítať z config.yaml"; \
-      exit 1; \
-    fi; \
+    # OPRAVENÁ URL: XMRig zmenil názvoslovie balíkov, linux-static-x64 neexistuje pre každú verziu
+    wget -O /tmp/xmrig.tar.gz "https://github.com/xmrig/xmrig/releases/download/v${XMRIG_VERSION}/xmrig-${XMRIG_VERSION}-linux-x64.tar.gz"; \
     \
-    echo "Sťahujem XMRig verziu: v${VERSION}"; \
-    \
-    # Stiahnutie správneho archívu z GitHubu
-    wget -O /tmp/xmrig.tar.gz "https://github.com/xmrig/xmrig/releases/download/v${VERSION}/xmrig-${VERSION}-linux-static-x64.tar.gz"; \
-    \
-    # Rozbalenie a presun binárky
     tar -xf /tmp/xmrig.tar.gz -C /tmp; \
-    mv "/tmp/xmrig-${VERSION}/xmrig" /usr/bin/xmrig; \
+    \
+    # Presun binárky (priečinok po rozbalení nemá v názve '-linux-x64')
+    mv "/tmp/xmrig-${XMRIG_VERSION}/xmrig" /usr/bin/xmrig; \
     chmod +x /usr/bin/xmrig; \
     \
     # Upratovanie
-    rm -rf /tmp/xmrig* /tmp/addon-config.yaml
+    rm -rf /tmp/xmrig*
 
 # 4. Spustenie
 COPY rootfs/run.sh /run.sh
