@@ -51,9 +51,14 @@ THREAD_ARGS=""
 PRIO_ARGS=""
 [ "$PRIO" -gt 0 ] && PRIO_ARGS="--cpu-priority=${PRIO}"
 
+# OVERENÉ PARAMETRE PRE CLI XMRig v6.21.0:
+# --msr-gen=0 vypne pokusy o zápis MSR (nahradzuje chýbajúci --no-cpu-msr)
+# --randomx-no-rdmsr vypne čítanie MSR registrov
+# --no-huge-pages vypne pokusy o alokáciu veľkých stránok pamäte
+SAFE_PARAMS="--msr-gen=0 --randomx-no-rdmsr --no-huge-pages --keepalive"
+
 echo "[xmrig-addon] Step 1: Trying FAST mode..."
 
-# OPRAVENÉ: Správne CLI parametre pre XMRig
 /usr/bin/xmrig \
   --url "${POOL_HOST}:${POOL_PORT}" \
   --user "$WALLET" \
@@ -62,9 +67,7 @@ echo "[xmrig-addon] Step 1: Trying FAST mode..."
   $THREAD_ARGS \
   $PRIO_ARGS \
   --randomx-mode=fast \
-  --no-cpu-msr \
-  --randomx-no-rdmsr \
-  --no-huge-pages
+  $SAFE_PARAMS
 
 if [ $? -ne 0 ]; then
   echo "[xmrig-addon] FAST mode failed. Switching to LIGHT mode..."
@@ -77,7 +80,5 @@ if [ $? -ne 0 ]; then
     $THREAD_ARGS \
     $PRIO_ARGS \
     --randomx-mode=light \
-    --no-cpu-msr \
-    --randomx-no-rdmsr \
-    --no-huge-pages
+    $SAFE_PARAMS
 fi
