@@ -1,4 +1,3 @@
-
 FROM ghcr.io/home-assistant/amd64-base-debian:bookworm
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -9,9 +8,7 @@ RUN set -eux; \
       ca-certificates \
       wget \
       tar \
-      jq \
-      msr-tools \
-      kmod; \
+      jq; \
     rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
@@ -25,4 +22,3 @@ COPY rootfs/run.sh /run.sh
 RUN chmod a+x /run.sh
 
 ENTRYPOINT ["/bin/bash", "/run.sh"]
-
