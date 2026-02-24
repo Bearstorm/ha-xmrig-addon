@@ -1,8 +1,9 @@
+
 FROM ghcr.io/home-assistant/amd64-base-debian:bookworm
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# 1. Inštalácia potrebných balíkov
+# 1. Inštalácia závislostí
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -12,14 +13,14 @@ RUN set -eux; \
       jq; \
     rm -rf /var/lib/apt/lists/*
 
-# 2. Skopírovanie súboru s verziou (uisti sa, že súbor XMRIG_VERSION existuje v tvojom repozitári)
-# Ak chceš verziu ťahať priamo z config.yaml, zmeň cestu nižšie.
+# 2. Skopírovanie súboru s verziou
+# Predpokladáme, že súbor XMRIG_VERSION je v rovnakom priečinku ako Dockerfile
 COPY XMRIG_VERSION /tmp/XMRIG_VERSION
 
 # 3. Stiahnutie a inštalácia XMRig
 RUN set -eux; \
-    # Vyčistenie verzie (odstráni \r, \n, medzery a úvodzovky)
-    VERSION=$(cat /tmp/XMRIG_VERSION | tr -d '\r\n" '); \
+    # Načítanie verzie a odstránenie bielych znakov (medzery, nové riadky)
+    VERSION=$(cat /tmp/XMRIG_VERSION | tr -d '\r\n '); \
     \
     if [[ -z "$VERSION" ]]; then \
       echo "ERROR: XMRIG_VERSION is empty"; \
@@ -28,19 +29,19 @@ RUN set -eux; \
     \
     echo "Sťahujem XMRig verziu: v${VERSION}"; \
     \
-    # URL na GitHub vyžaduje 'v' pred číslom verzie v ceste, ale archív ho v názve nemá
+    # XMRig vyžaduje v URL 'v' pred číslom verzie, ale v názve archívu nie
     wget -O /tmp/xmrig.tar.gz "https://github.com/xmrig/xmrig/releases/download/v${VERSION}/xmrig-${VERSION}-linux-static-x64.tar.gz"; \
     \
     tar -xf /tmp/xmrig.tar.gz -C /tmp; \
     \
-    # Presun binárky do systému
+    # Presun binárky do /usr/bin/
     mv "/tmp/xmrig-${VERSION}/xmrig" /usr/bin/xmrig; \
     chmod +x /usr/bin/xmrig; \
     \
-    # Upratovanie dočasných súborov
+    # Vyčistenie
     rm -rf /tmp/xmrig* /tmp/XMRIG_VERSION
 
-# 4. Príprava spúšťacieho skriptu
+# 4. Nastavenie spúšťacieho skriptu
 COPY rootfs/run.sh /run.sh
 RUN chmod a+x /run.sh
 
