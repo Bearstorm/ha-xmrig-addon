@@ -65,3 +65,4 @@ exec /usr/bin/xmrig \
   $THREAD_ARGS \
   $PRIO_ARGS \
   --randomx-mode=fast
+  --no-cpu-msr
