@@ -1,10 +1,8 @@
-
 #!/bin/sh
 
-# Výpis hneď po štarte, aby sme videli, že skript žije
+# Výpis hneď po štarte
 echo "[xmrig-addon] run.sh script started..."
 
-# Nastavíme len -u (pád pri nedefinovanej premennej), nie -e
 set -u
 
 CONFIG_PATH="/data/options.json"
@@ -35,7 +33,6 @@ else
   POOL_PORT="3333"
 fi
 
-# Kontrola povinných údajov
 if [ -z "$POOL_HOST" ] || [ "$POOL_HOST" = "null" ]; then
   echo "[xmrig-addon] ERROR: pool is empty"
   exit 1
@@ -58,13 +55,9 @@ THREAD_ARGS=""
 PRIO_ARGS=""
 [ "$PRIO" -gt 0 ] && PRIO_ARGS="--cpu-priority=${PRIO}"
 
-# OPRAVENÉ Parametre pre čistý log v HAOS Safe
-# XMRig vyžaduje --cpu-no-msr (nie no-cpu-msr)
-SAFE_PARAMS="--cpu-no-msr --no-huge-pages --randomx-no-rdmsr --keepalive"
-
 echo "[xmrig-addon] Step 1: Trying FAST mode..."
 
-# Prvý pokus - FAST
+# Prvý pokus - FAST (Parametre napísané priamo a správne)
 /usr/bin/xmrig \
   --url "${POOL_HOST}:${POOL_PORT}" \
   --user "$WALLET" \
@@ -73,9 +66,12 @@ echo "[xmrig-addon] Step 1: Trying FAST mode..."
   $THREAD_ARGS \
   $PRIO_ARGS \
   --randomx-mode=fast \
-  $SAFE_PARAMS
+  --cpu-no-msr \
+  --no-huge-pages \
+  --randomx-no-rdmsr \
+  --keepalive
 
-# Ak prvý pokus zlyhal (exit code nie je 0)
+# Ak prvý pokus zlyhal
 if [ $? -ne 0 ]; then
   echo "[xmrig-addon] FAST mode failed. Switching to LIGHT mode..."
   
@@ -87,5 +83,8 @@ if [ $? -ne 0 ]; then
     $THREAD_ARGS \
     $PRIO_ARGS \
     --randomx-mode=light \
-    $SAFE_PARAMS
+    --cpu-no-msr \
+    --no-huge-pages \
+    --randomx-no-rdmsr \
+    --keepalive
 fi
