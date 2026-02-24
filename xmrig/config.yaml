@@ -1,6 +1,9 @@
-name: XMRig Miner
+name: XMRig Miner (Debian 12 / HA Supervised)
 slug: xmrig
-description: High-performance Monero miner with CPU and thread control.
+description: >
+  High-performance Monero miner with MSR and host access.
+  Intended for Debian 12 host running Home Assistant Supervised (NOT Home Assistant OS).
+  Requires elevated permissions (host network, /dev/cpu, capabilities). Not suitable for "Protection mode".
 version: "6.21.7"
 url: "https://github.com/Bearstorm/ha-xmrig-addon"
 
