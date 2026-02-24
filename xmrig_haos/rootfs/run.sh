@@ -1,25 +1,29 @@
 #!/bin/sh
 
-# Odstránili sme -e, aby skript nezomrel pri páde prvého pokusu o XMRig
+# Výpis hneď po štarte, aby sme videli, že skript žije
+echo "[xmrig-addon] run.sh script started..."
+
+# Nastavíme len -u (pád pri nedefinovanej premennej), nie -e
 set -u
 
 CONFIG_PATH="/data/options.json"
 
-POOL="$(jq -r '.pool // ""' "$CONFIG_PATH")"
-PORT="$(jq -r '.port // 0' "$CONFIG_PATH")"
-WALLET="$(jq -r '.wallet // ""' "$CONFIG_PATH")"
-WORKER="$(jq -r '.worker // ""' "$CONFIG_PATH")"
-THREADS="$(jq -r '.threads // 0' "$CONFIG_PATH")"
-PRIO="$(jq -r '.priority // 0' "$CONFIG_PATH")"
+# Načítanie premenných
+POOL=$(jq -r '.pool // ""' "$CONFIG_PATH")
+PORT=$(jq -r '.port // 0' "$CONFIG_PATH")
+WALLET=$(jq -r '.wallet // ""' "$CONFIG_PATH")
+WORKER=$(jq -r '.worker // ""' "$CONFIG_PATH")
+THREADS=$(jq -r '.threads // 0' "$CONFIG_PATH")
+PRIO=$(jq -r '.priority // 0' "$CONFIG_PATH")
 
-POOL_CLEAN="$(echo "$POOL" | sed 's#^[a-zA-Z0-9+.-]*://##')"
-
+# Čistenie URL
+POOL_CLEAN=$(echo "$POOL" | sed 's#^[a-zA-Z0-9+.-]*://##')
 POOL_HOST="$POOL_CLEAN"
 POOL_PORT_FROM_POOL=""
 
 if echo "$POOL_CLEAN" | grep -q ':'; then
-  POOL_HOST="$(echo "$POOL_CLEAN" | awk -F: '{print $1}')"
-  POOL_PORT_FROM_POOL="$(echo "$POOL_CLEAN" | awk -F: '{print $2}')"
+  POOL_HOST=$(echo "$POOL_CLEAN" | awk -F: '{print $1}')
+  POOL_PORT_FROM_POOL=$(echo "$POOL_CLEAN" | awk -F: '{print $2}')
 fi
 
 if [ "$PORT" -gt 0 ] 2>/dev/null; then
@@ -30,41 +34,35 @@ else
   POOL_PORT="3333"
 fi
 
-if [ -z "$POOL_HOST" ]; then
+# Kontrola povinných údajov
+if [ -z "$POOL_HOST" ] || [ "$POOL_HOST" = "null" ]; then
   echo "[xmrig-addon] ERROR: pool is empty"
   exit 1
 fi
 
-if [ -z "$WALLET" ]; then
+if [ -z "$WALLET" ] || [ "$WALLET" = "null" ]; then
   echo "[xmrig-addon] ERROR: wallet is empty"
   exit 1
 fi
 
-echo "[xmrig-addon] (HAOS Safe) Preparing XMRig for ${POOL_HOST}:${POOL_PORT}"
-echo "[xmrig-addon] Wallet: ${WALLET}"
-echo "[xmrig-addon] Worker: ${WORKER}"
+echo "[xmrig-addon] (HAOS Safe) Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
 
+# Argumenty
 TLS_ARGS=""
-if [ "$POOL_PORT" = "443" ]; then
-  TLS_ARGS="--tls"
-fi
+[ "$POOL_PORT" = "443" ] && TLS_ARGS="--tls"
 
 THREAD_ARGS=""
-if [ "$THREADS" -gt 0 ] 2>/dev/null; then
-  THREAD_ARGS="--threads=${THREADS}"
-fi
+[ "$THREADS" -gt 0 ] && THREAD_ARGS="--threads=${THREADS}"
 
 PRIO_ARGS=""
-if [ "$PRIO" -gt 0 ] 2>/dev/null; then
-  PRIO_ARGS="--cpu-priority=${PRIO}"
-fi
+[ "$PRIO" -gt 0 ] && PRIO_ARGS="--cpu-priority=${PRIO}"
 
-# Spoločné parametre pre čistý log v Safe Mode
+# Parametre pre čistý log v HAOS Safe
 SAFE_PARAMS="--no-cpu-msr --no-huge-pages --randomx-no-rdmsr --keepalive"
 
-echo "[xmrig-addon] Step 1: Attempting FAST mode..."
+echo "[xmrig-addon] Step 1: Trying FAST mode..."
 
-# Prvý pokus v režime FAST
+# Prvý pokus - FAST
 /usr/bin/xmrig \
   --url "${POOL_HOST}:${POOL_PORT}" \
   --user "$WALLET" \
@@ -75,11 +73,10 @@ echo "[xmrig-addon] Step 1: Attempting FAST mode..."
   --randomx-mode=fast \
   $SAFE_PARAMS
 
-# Ak prvý pokus zlyhal (exit code iný ako 0)
+# Ak prvý pokus zlyhal (exit code nie je 0)
 if [ $? -ne 0 ]; then
-  echo "[xmrig-addon] FAST mode failed (likely memory constraints). Falling back to LIGHT mode..."
+  echo "[xmrig-addon] FAST mode failed. Switching to LIGHT mode..."
   
-  # Druhý pokus v režime LIGHT - tu už použijeme exec
   exec /usr/bin/xmrig \
     --url "${POOL_HOST}:${POOL_PORT}" \
     --user "$WALLET" \
