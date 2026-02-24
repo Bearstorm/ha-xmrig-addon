@@ -1,13 +1,11 @@
 #!/bin/sh
 
-# Výpis hneď po štarte
 echo "[xmrig-addon] run.sh script started..."
 
 set -u
 
 CONFIG_PATH="/data/options.json"
 
-# Načítanie premenných
 POOL=$(jq -r '.pool // ""' "$CONFIG_PATH")
 PORT=$(jq -r '.port // 0' "$CONFIG_PATH")
 WALLET=$(jq -r '.wallet // ""' "$CONFIG_PATH")
@@ -15,7 +13,6 @@ WORKER=$(jq -r '.worker // ""' "$CONFIG_PATH")
 THREADS=$(jq -r '.threads // 0' "$CONFIG_PATH")
 PRIO=$(jq -r '.priority // 0' "$CONFIG_PATH")
 
-# Čistenie URL
 POOL_CLEAN=$(echo "$POOL" | sed 's#^[a-zA-Z0-9+.-]*://##')
 POOL_HOST="$POOL_CLEAN"
 POOL_PORT_FROM_POOL=""
@@ -45,7 +42,6 @@ fi
 
 echo "[xmrig-addon] (HAOS Safe) Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
 
-# Argumenty
 TLS_ARGS=""
 [ "$POOL_PORT" = "443" ] && TLS_ARGS="--tls"
 
@@ -57,7 +53,7 @@ PRIO_ARGS=""
 
 echo "[xmrig-addon] Step 1: Trying FAST mode..."
 
-# Prvý pokus - FAST (Parametre napísané priamo a správne)
+# OPRAVENÉ: Správne CLI parametre pre XMRig
 /usr/bin/xmrig \
   --url "${POOL_HOST}:${POOL_PORT}" \
   --user "$WALLET" \
@@ -66,12 +62,10 @@ echo "[xmrig-addon] Step 1: Trying FAST mode..."
   $THREAD_ARGS \
   $PRIO_ARGS \
   --randomx-mode=fast \
-  --cpu-no-msr \
-  --no-huge-pages \
+  --no-cpu-msr \
   --randomx-no-rdmsr \
-  --keepalive
+  --no-huge-pages
 
-# Ak prvý pokus zlyhal
 if [ $? -ne 0 ]; then
   echo "[xmrig-addon] FAST mode failed. Switching to LIGHT mode..."
   
@@ -83,8 +77,7 @@ if [ $? -ne 0 ]; then
     $THREAD_ARGS \
     $PRIO_ARGS \
     --randomx-mode=light \
-    --cpu-no-msr \
-    --no-huge-pages \
+    --no-cpu-msr \
     --randomx-no-rdmsr \
-    --keepalive
+    --no-huge-pages
 fi
