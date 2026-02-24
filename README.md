@@ -59,7 +59,8 @@ This add-on requires elevated privileges for MSR optimization.
 - **Recommended CPU:** Intel i5/i7 (10th Gen+) or AMD Ryzen 5+
 - **RAM:** 4GB minimum (8GB+ recommended if running Frigate)
 - **Storage:** ~500MB free
-- **OS:** HAOS or Supervised (Debian 12 recommended)
+- **OS:** Debian 12 + HA Supervised (recommended)
+- **HAOS:** Supported with limitations (Protection Mode must be disabled; MSR may be restricted)
 
 ---
 
@@ -141,6 +142,7 @@ Then:
 | Host PID | Low-level CPU operations |
 
 Disable Protection Mode only if trusted.
+This add-on operates with elevated container privileges and is intended for trusted environments.
 
 ---
 
