@@ -2,17 +2,18 @@ FROM ghcr.io/home-assistant/amd64-base-debian:bookworm
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# 1. Inštalácia systémových balíkov
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
       ca-certificates \
       wget \
       tar \
-      jq \
-      msr-tools \
-      kmod; \
+      jq; \
     rm -rf /var/lib/apt/lists/*
 
+# 2. Stiahnutie XMRig verzie 6.21.0 napevno
+# Používame linux-static-x64, ktorý ti funguje v druhom addone
 RUN set -eux; \
     wget -O /tmp/xmrig.tar.gz https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-linux-static-x64.tar.gz; \
     tar -xf /tmp/xmrig.tar.gz -C /tmp; \
@@ -20,6 +21,8 @@ RUN set -eux; \
     chmod +x /usr/bin/xmrig; \
     rm -rf /tmp/xmrig* /tmp/xmrig.tar.gz
 
+# 3. Príprava spúšťacieho skriptu
+# Predpokladá, že máš v priečinku xmrig_haos priečinok rootfs a v ňom run.sh
 COPY rootfs/run.sh /run.sh
 RUN chmod a+x /run.sh
 
