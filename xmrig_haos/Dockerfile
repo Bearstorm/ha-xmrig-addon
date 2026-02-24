@@ -2,7 +2,7 @@ FROM ghcr.io/home-assistant/amd64-base-debian:bookworm
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Potrebujeme len základ (HAOS safe): bez msr-tools, bez kmod
+# HAOS safe: minimum packages
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -12,24 +12,23 @@ RUN set -eux; \
       jq; \
     rm -rf /var/lib/apt/lists/*
 
-# Prekopíruj config.yaml kvôli verzii (build-time)
-COPY config.yaml /tmp/addon-config.yaml
+# Upstream XMRig version (NOT addon version)
+COPY XMRIG_VERSION /tmp/XMRIG_VERSION
 
-# Stiahni XMRig verziu presne podľa config.yaml (napr. 6.21.7)
 RUN set -eux; \
-    VERSION="$(grep -E '^version:' /tmp/addon-config.yaml | head -n1 | cut -d':' -f2- | tr -d '\r\n' | tr -d ' "')"; \
-    if [[ -z "$VERSION" ]]; then \
-      echo "ERROR: VERSION is empty from config.yaml"; \
-      echo "--- config.yaml ---"; \
-      cat /tmp/addon-config.yaml; \
+    XMRIG_VERSION="$(tr -d '\r\n ' < /tmp/XMRIG_VERSION)"; \
+    if [[ -z "$XMRIG_VERSION" ]]; then \
+      echo "ERROR: XMRIG_VERSION is empty"; \
+      echo "--- /tmp/XMRIG_VERSION ---"; \
+      cat /tmp/XMRIG_VERSION || true; \
       exit 1; \
     fi; \
-    echo "Using XMRig VERSION=$VERSION from xmrig_haos/config.yaml"; \
-    wget -O /tmp/xmrig.tar.gz "https://github.com/xmrig/xmrig/releases/download/v${VERSION}/xmrig-${VERSION}-linux-static-x64.tar.gz"; \
+    echo "Using upstream XMRig version: $XMRIG_VERSION"; \
+    wget -O /tmp/xmrig.tar.gz "https://github.com/xmrig/xmrig/releases/download/v${XMRIG_VERSION}/xmrig-${XMRIG_VERSION}-linux-static-x64.tar.gz"; \
     tar -xf /tmp/xmrig.tar.gz -C /tmp; \
-    mv "/tmp/xmrig-${VERSION}/xmrig" /usr/bin/xmrig; \
+    mv "/tmp/xmrig-${XMRIG_VERSION}/xmrig" /usr/bin/xmrig; \
     chmod +x /usr/bin/xmrig; \
-    rm -rf /tmp/xmrig* /tmp/addon-config.yaml
+    rm -rf /tmp/xmrig* /tmp/XMRIG_VERSION
 
 COPY rootfs/run.sh /run.sh
 RUN chmod a+x /run.sh
