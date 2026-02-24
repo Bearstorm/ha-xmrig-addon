@@ -1,3 +1,4 @@
+
 #!/bin/sh
 
 # Výpis hneď po štarte, aby sme videli, že skript žije
@@ -57,8 +58,9 @@ THREAD_ARGS=""
 PRIO_ARGS=""
 [ "$PRIO" -gt 0 ] && PRIO_ARGS="--cpu-priority=${PRIO}"
 
-# Parametre pre čistý log v HAOS Safe
-SAFE_PARAMS="--no-cpu-msr --no-huge-pages --randomx-no-rdmsr --keepalive"
+# OPRAVENÉ Parametre pre čistý log v HAOS Safe
+# XMRig vyžaduje --cpu-no-msr (nie no-cpu-msr)
+SAFE_PARAMS="--cpu-no-msr --no-huge-pages --randomx-no-rdmsr --keepalive"
 
 echo "[xmrig-addon] Step 1: Trying FAST mode..."
 
