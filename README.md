@@ -1,22 +1,5 @@
 # 🪙 XMRig Miner Add-on for Home Assistant
 
----
-
-## 🔀 Which Version Should I Install?
-
-| Your System | Install This Add-on |
-|-------------|---------------------|
-| Home Assistant OS (HAOS) | **XMRig Miner (HAOS Safe)** |
-| Home Assistant Supervised (Debian 12) | **XMRig Miner (Supervised / MSR)** |
-
-### How to check your system:
-Go to:
-Settings → System → About
-
-- If you see **Home Assistant OS** → use HAOS Safe
-- If you see **Home Assistant Supervised** → use Supervised version
-
----
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
 ![Architecture](https://img.shields.io/badge/Arch-amd64-orange.svg)
@@ -38,6 +21,22 @@ High-performance and fully configurable **Monero (XMR)** mining add-on for Home 
 Optimized for **x86_64 (amd64)** architecture and tuned for modern Intel (10th–12th Gen) and AMD processors.
 
 > ⚠ **Important:** Versions older than **6.21.6** are not recommended due to unstable MSR handling and privilege inconsistencies.
+
+---
+
+## 🔀 Which Version Should I Install?
+
+| Your System | Install This Add-on |
+|-------------|---------------------|
+| Home Assistant OS (HAOS) | **XMRig Miner (HAOS Safe)** |
+| Home Assistant Supervised (Debian 12) | **XMRig Miner (Supervised / MSR)** |
+
+### How to check your system:
+Go to:
+Settings → System → About
+
+- If you see **Home Assistant OS** → use HAOS Safe
+- If you see **Home Assistant Supervised** → use Supervised version
 
 ---
 
