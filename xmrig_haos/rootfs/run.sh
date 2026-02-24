@@ -1,5 +1,7 @@
 #!/bin/sh
-set -eu
+
+# Odstránili sme -e, aby skript nezomrel pri páde prvého pokusu o XMRig
+set -u
 
 CONFIG_PATH="/data/options.json"
 
@@ -38,7 +40,7 @@ if [ -z "$WALLET" ]; then
   exit 1
 fi
 
-echo "[xmrig-addon] (HAOS Safe) Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
+echo "[xmrig-addon] (HAOS Safe) Preparing XMRig for ${POOL_HOST}:${POOL_PORT}"
 echo "[xmrig-addon] Wallet: ${WALLET}"
 echo "[xmrig-addon] Worker: ${WORKER}"
 
@@ -57,12 +59,34 @@ if [ "$PRIO" -gt 0 ] 2>/dev/null; then
   PRIO_ARGS="--cpu-priority=${PRIO}"
 fi
 
-exec /usr/bin/xmrig \
+# Spoločné parametre pre čistý log v Safe Mode
+SAFE_PARAMS="--no-cpu-msr --no-huge-pages --randomx-no-rdmsr --keepalive"
+
+echo "[xmrig-addon] Step 1: Attempting FAST mode..."
+
+# Prvý pokus v režime FAST
+/usr/bin/xmrig \
   --url "${POOL_HOST}:${POOL_PORT}" \
   --user "$WALLET" \
   --pass "$WORKER" \
   $TLS_ARGS \
   $THREAD_ARGS \
   $PRIO_ARGS \
-  --randomx-mode=fast
-  --no-cpu-msr
+  --randomx-mode=fast \
+  $SAFE_PARAMS
+
+# Ak prvý pokus zlyhal (exit code iný ako 0)
+if [ $? -ne 0 ]; then
+  echo "[xmrig-addon] FAST mode failed (likely memory constraints). Falling back to LIGHT mode..."
+  
+  # Druhý pokus v režime LIGHT - tu už použijeme exec
+  exec /usr/bin/xmrig \
+    --url "${POOL_HOST}:${POOL_PORT}" \
+    --user "$WALLET" \
+    --pass "$WORKER" \
+    $TLS_ARGS \
+    $THREAD_ARGS \
+    $PRIO_ARGS \
+    --randomx-mode=light \
+    $SAFE_PARAMS
+fi
