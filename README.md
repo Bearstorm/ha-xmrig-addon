@@ -4,7 +4,7 @@
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
 ![Architecture](https://img.shields.io/badge/Arch-amd64-orange.svg)
 ![HAOS Compatible](https://img.shields.io/badge/HAOS-Compatible-green.svg)
-![Supervised](https://img.shields.io/badge/Supervised-Debian%2012-blue.svg)
+![Supervised MSR](https://img.shields.io/badge/Supervised-Debian%2012-blue.svg)
 ![MSR Optional](https://img.shields.io/badge/MSR-Optional-yellow.svg)
 ![RandomX Optimized](https://img.shields.io/badge/RandomX-Optimized-red.svg)
 
@@ -40,19 +40,10 @@ Settings → System → About
 
 ---
 
-## ⚠ Platform Support Clarification
-
-This add-on requires elevated privileges for MSR optimization.
-
-- ✅ **Primary supported platform:** Debian 12 + Home Assistant Supervised
-- ⚠ **HAOS:** Supported with limitations. Protection Mode must be disabled and kernel security policies may still block MSR access.
-- ❌ ARM architectures are not supported.
-
----
-
 ## 📑 Table of Contents
 
 - [System Requirements](#-system-requirements)
+- [Variant Comparison](#-variant-comparison)
 - [Installation](#-installation)
 - [Configuration](#-configuration)
 - [MSR Optimization](#-msr-optimization-advanced)
@@ -68,6 +59,38 @@ This add-on requires elevated privileges for MSR optimization.
 
 ---
 
+## 🔎 Variant Comparison
+
+**Quick pick:** HAOS → **HAOS Safe** | Debian 12 Supervised → **Supervised / MSR**
+
+| Feature | HAOS Safe | Supervised / MSR |
+|----------|------------|-------------------|
+| MSR Optimization | ❌ | ✅ |
+| Protection Mode ON | ✅ | ❌ |
+| Host Privileges Required | ❌ | ✅ |
+| Kernel Module Required | ❌ | ✅ |
+| Recommended Platform | HAOS | Debian 12 |
+
+---
+
+## ⚠ Platform Support Clarification
+
+This repository contains **two separate add-ons**:
+
+### 🛡 XMRig Miner (HAOS Safe)
+- Designed for Home Assistant OS
+- No MSR access
+- Works with Protection Mode ON
+- No host privileges required
+
+### ⚙ XMRig Miner (Supervised / MSR)
+- Designed for Debian 12 + Home Assistant Supervised
+- Supports MSR optimization
+- Requires elevated container privileges
+- Protection Mode must be disabled
+
+---
+
 ## 💻 System Requirements
 
 - **Architecture:** x86_64 (Intel or AMD)  
@@ -76,8 +99,8 @@ This add-on requires elevated privileges for MSR optimization.
 - **Recommended CPU:** Intel i5/i7 (10th Gen+) or AMD Ryzen 5+
 - **RAM:** 4GB minimum (8GB+ recommended if running Frigate)
 - **Storage:** ~500MB free
-- **OS:** Debian 12 + HA Supervised (recommended)
-- **HAOS:** Supported with limitations (Protection Mode must be disabled; MSR may be restricted)
+- **Debian 12 + HA Supervised** → Use Supervised/MSR variant
+- **Home Assistant OS (HAOS)** → Use HAOS Safe variant
 
 ---
 
@@ -91,7 +114,9 @@ This add-on requires elevated privileges for MSR optimization.
 https://github.com/Bearstorm/ha-xmrig-addon
 ```
 
-4. Install **XMRig Miner**
+4. Choose the correct variant:
+   - **XMRig Miner (HAOS Safe)** for Home Assistant OS
+   - **XMRig Miner (Supervised / MSR)** for Debian 12 + Home Assistant Supervised
 5. Configure wallet and pool
 6. Start
 
@@ -107,7 +132,7 @@ https://github.com/Bearstorm/ha-xmrig-addon
 | `worker` | Worker name | HA |
 | `threads` | CPU threads used | Total - 2 |
 | `priority` | CPU priority (0–5) | 2 |
-| `msr_mod` | Enables MSR optimization | true |
+| `msr_mod` | Enables MSR optimization (Supervised variant only) | true |
 
 ---
 
@@ -140,26 +165,28 @@ Then:
 
 ---
 
-### Home Assistant OS (HAOS)
+### MSR Availability
 
-- Disable **Protection Mode**
-- Restart add-on
-- Enable `msr_mod`
+MSR optimization is available **only in the Supervised / MSR variant**.
 
-> Some HAOS kernel versions restrict MSR access.
+The HAOS Safe variant:
+- does NOT support MSR
+- does NOT require kernel modules
+- works with Protection Mode ON
 
 ---
 
 ## 🔐 Security Model
 
-| Feature | Required For |
-|----------|--------------|
-| Protection Mode OFF | MSR access |
-| Full hardware access | MSR tuning |
-| Host PID | Low-level CPU operations |
+### HAOS Safe Variant
+- Runs without host privileges
+- Compatible with Protection Mode ON
+- No kernel-level access
 
-Disable Protection Mode only if trusted.
-This add-on operates with elevated container privileges and is intended for trusted environments.
+### Supervised / MSR Variant
+- Requires elevated container privileges
+- Protection Mode must be disabled
+- Uses low-level CPU operations (MSR)
 
 ---
 
@@ -187,6 +214,9 @@ Performance depends on L3 cache and memory speed.
 ---
 
 ## 🛠 Troubleshooting
+
+> MSR-related errors apply only to the Supervised / MSR variant.
+> HAOS Safe users can ignore MSR warnings.
 
 | Log Message | Meaning | Fix |
 |-------------|----------|------|
