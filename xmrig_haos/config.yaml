@@ -1,6 +1,9 @@
 name: XMRig Miner (HAOS Safe)
 slug: xmrig_haos
-description: Lightweight XMRig miner for Home Assistant OS (no MSR, no host privileges).
+description: >
+  Lightweight XMRig miner for Home Assistant OS (HAOS).
+  No MSR tuning, no host access, no privileged mode.
+  Works with Protection Mode ON.
 version: "6.21.7"
 url: "https://github.com/Bearstorm/ha-xmrig-addon"
 
@@ -14,8 +17,6 @@ init: false
 # SAFE – žiadne host oprávnenia
 host_network: false
 host_pid: false
-
-# Neuvádzame apparmor, privileged, devices, full_access, kernel_modules
 
 options:
   pool: "pool.supportxmr.com"
