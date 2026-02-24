@@ -29,19 +29,18 @@ else
 fi
 
 if [ -z "$POOL_HOST" ]; then
-  echo "[xmrig-haos] ERROR: pool is empty"
+  echo "[xmrig-addon] ERROR: pool is empty"
   exit 1
 fi
 
 if [ -z "$WALLET" ]; then
-  echo "[xmrig-haos] ERROR: wallet is empty"
+  echo "[xmrig-addon] ERROR: wallet is empty"
   exit 1
 fi
 
-echo "[xmrig-haos] Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
-echo "[xmrig-haos] Wallet: ${WALLET}"
-echo "[xmrig-haos] Worker: ${WORKER}"
-echo "[xmrig-haos] Mode: HAOS Safe (no MSR, no host privileges)"
+echo "[xmrig-addon] (HAOS Safe) Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
+echo "[xmrig-addon] Wallet: ${WALLET}"
+echo "[xmrig-addon] Worker: ${WORKER}"
 
 TLS_ARGS=""
 if [ "$POOL_PORT" = "443" ]; then
@@ -65,6 +64,4 @@ exec /usr/bin/xmrig \
   $TLS_ARGS \
   $THREAD_ARGS \
   $PRIO_ARGS \
-  --randomx-mode=fast \
-  --randomx-wrmsr=0 \
-  --randomx-no-rdmsr
+  --randomx-mode=fast
