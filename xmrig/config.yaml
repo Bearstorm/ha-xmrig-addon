@@ -1,4 +1,4 @@
-name: XMRig Miner (Debian 12 / HA Supervised)
+name: XMRig Miner (Supervised / MSR)
 slug: xmrig
 description: >
   High-performance Monero miner with MSR and host access.
