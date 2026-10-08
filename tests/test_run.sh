@@ -5,7 +5,7 @@ set -euo pipefail
 # ==================================================
 # XMRig HAOS Safe - Functional Tests
 #
-# Tests the real startup script with:
+# Tests the real startup script using:
 # - temporary configuration files
 # - simulated system memory
 # - simulated cgroup limits
@@ -87,6 +87,7 @@ set_config() {
     local worker="$4"
     local threads="$5"
     local priority="$6"
+    local tls_mode="${7:-}"
 
     jq -n \
         --arg pool "$pool" \
@@ -95,6 +96,7 @@ set_config() {
         --arg worker "$worker" \
         --arg threads "$threads" \
         --arg priority "$priority" \
+        --arg tls_mode "$tls_mode" \
         '{
             pool: $pool,
             port: $port,
@@ -102,7 +104,12 @@ set_config() {
             worker: $worker,
             threads: $threads,
             priority: $priority
-        }' > "$CONFIG_FILE"
+        } +
+        (if $tls_mode == "" then
+            {}
+         else
+            {tls_mode: $tls_mode}
+         end)' > "$CONFIG_FILE"
 }
 
 default_config() {
@@ -163,7 +170,7 @@ fail() {
 }
 
 # --------------------------------------------------
-# 4. Functional tests
+# 4. Original functional tests
 # --------------------------------------------------
 
 echo "======================================"
@@ -413,7 +420,132 @@ else
 fi
 
 # --------------------------------------------------
-# 5. Final summary
+# 5. New TLS functional tests
+# --------------------------------------------------
+
+# TEST 15 - Force TLS on port 3333
+
+set_config \
+    "pool.example.org" \
+    "3333" \
+    "TEST_WALLET_ONLY" \
+    "HA-Test" \
+    "2" \
+    "2" \
+    "enabled"
+
+default_memory
+
+if run_miner &&
+   assert_arg "--tls" &&
+   assert_output "TLS mode: enabled"; then
+    pass "TLS enabled on non-standard port"
+else
+    fail "TLS enabled on non-standard port"
+fi
+
+# TEST 16 - Force TLS off on port 443
+
+set_config \
+    "pool.example.org" \
+    "443" \
+    "TEST_WALLET_ONLY" \
+    "HA-Test" \
+    "2" \
+    "2" \
+    "disabled"
+
+default_memory
+
+if run_miner &&
+   assert_no_arg "--tls" &&
+   assert_output "TLS mode: disabled"; then
+    pass "TLS disabled on port 443"
+else
+    fail "TLS disabled on port 443"
+fi
+
+# TEST 17 - Auto mode on port 3333
+
+set_config \
+    "pool.example.org" \
+    "3333" \
+    "TEST_WALLET_ONLY" \
+    "HA-Test" \
+    "2" \
+    "2" \
+    "auto"
+
+default_memory
+
+if run_miner &&
+   assert_no_arg "--tls" &&
+   assert_output "TLS mode: auto"; then
+    pass "TLS auto mode on port 3333"
+else
+    fail "TLS auto mode on port 3333"
+fi
+
+# TEST 18 - Invalid TLS mode rejected
+
+set_config \
+    "pool.example.org" \
+    "443" \
+    "TEST_WALLET_ONLY" \
+    "HA-Test" \
+    "2" \
+    "2" \
+    "invalid"
+
+default_memory
+
+if ! run_miner; then
+    if assert_output "Invalid TLS mode" &&
+       [[ ! -f "$ARGS_FILE" ]]; then
+        pass "Invalid TLS mode rejected"
+    else
+        fail "Invalid TLS mode rejected"
+    fi
+else
+    fail "Invalid TLS mode rejected"
+fi
+
+# TEST 19 - Missing TLS mode defaults to auto
+
+default_config
+default_memory
+
+if run_miner &&
+   assert_arg "--tls" &&
+   assert_output "TLS mode: auto"; then
+    pass "Missing TLS mode defaults to auto"
+else
+    fail "Missing TLS mode defaults to auto"
+fi
+
+# TEST 20 - Explicit TLS enabled on port 443
+
+set_config \
+    "pool.example.org" \
+    "443" \
+    "TEST_WALLET_ONLY" \
+    "HA-Test" \
+    "2" \
+    "2" \
+    "enabled"
+
+default_memory
+
+if run_miner &&
+   assert_arg "--tls" &&
+   assert_output "TLS mode: enabled"; then
+    pass "Explicit TLS enabled on port 443"
+else
+    fail "Explicit TLS enabled on port 443"
+fi
+
+# --------------------------------------------------
+# 6. Final summary
 # --------------------------------------------------
 
 echo
