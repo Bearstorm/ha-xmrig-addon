@@ -5,8 +5,15 @@ on:
   push:
     branches:
       - main
+      - develop-v2
     tags:
       - "v*"
+
+  pull_request:
+    branches:
+      - main
+      - develop-v2
+
   workflow_dispatch:
 
 permissions:
@@ -15,7 +22,9 @@ permissions:
 
 jobs:
   build-amd64-supervised:
+    name: Build AMD64 Supervised/MSR
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,31 +32,59 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute image owner
+        id: owner
+        shell: bash
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          OWNER_LC="$(echo "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
+
+      - name: Determine publication settings
+        id: publication
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          PUSH_IMAGE=false
+          IMAGE_TAG=development
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            if [ "$GIT_REF" = "refs/heads/main" ]; then
+              PUSH_IMAGE=true
+              IMAGE_TAG=latest
+            elif [[ "$GIT_REF" == refs/tags/v* ]]; then
+              PUSH_IMAGE=true
+              IMAGE_TAG="$REF_NAME"
+            fi
+          fi
+
+          echo "push_image=$PUSH_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
       - name: Log in to GHCR
+        if: steps.publication.outputs.push_image == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image owner (lowercase)
-        id: owner
-        shell: bash
-        run: |
-          OWNER_LC="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
-          echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push (amd64 - supervised/msr)
+      - name: Build and optionally push Supervised/MSR
         uses: docker/build-push-action@v6
         with:
           context: ./xmrig
-          push: true
+          push: ${{ steps.publication.outputs.push_image == 'true' }}
           tags: |
-            ghcr.io/${{ steps.owner.outputs.OWNER_LC }}/amd64-ha-xmrig-addon:latest
+            ghcr.io/${{ steps.owner.outputs.OWNER_LC }}/amd64-ha-xmrig-addon:${{ steps.publication.outputs.image_tag }}
 
   build-amd64-haos:
+    name: Build AMD64 HAOS Safe
     runs-on: ubuntu-latest
-    # Odstránil som 'needs', aby buildy bežali nezávisle a rýchlejšie
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,24 +92,51 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute image owner
+        id: owner
+        shell: bash
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          OWNER_LC="$(echo "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
+
+      - name: Determine publication settings
+        id: publication
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          PUSH_IMAGE=false
+          IMAGE_TAG=development
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            if [ "$GIT_REF" = "refs/heads/main" ]; then
+              PUSH_IMAGE=true
+              IMAGE_TAG=latest
+            elif [[ "$GIT_REF" == refs/tags/v* ]]; then
+              PUSH_IMAGE=true
+              IMAGE_TAG="$REF_NAME"
+            fi
+          fi
+
+          echo "push_image=$PUSH_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
       - name: Log in to GHCR
+        if: steps.publication.outputs.push_image == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image owner (lowercase)
-        id: owner
-        shell: bash
-        run: |
-          OWNER_LC="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
-          echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push (amd64 - haos safe)
+      - name: Build and optionally push HAOS Safe
         uses: docker/build-push-action@v6
         with:
           context: ./xmrig_haos
-          push: true
+          push: ${{ steps.publication.outputs.push_image == 'true' }}
           tags: |
-            ghcr.io/${{ steps.owner.outputs.OWNER_LC }}/amd64-ha-xmrig-addon-haos:latest
+            ghcr.io/${{ steps.owner.outputs.OWNER_LC }}/amd64-ha-xmrig-addon-haos:${{ steps.publication.outputs.image_tag }}
