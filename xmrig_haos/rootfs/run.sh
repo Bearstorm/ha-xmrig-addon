@@ -64,6 +64,7 @@ WALLET=$(jq -r '.wallet // ""' "$CONFIG_PATH")
 WORKER=$(jq -r '.worker // ""' "$CONFIG_PATH")
 THREADS=$(jq -r '.threads // 2' "$CONFIG_PATH")
 PRIO=$(jq -r '.priority // 2' "$CONFIG_PATH")
+TLS_MODE=$(jq -r '.tls_mode // "auto"' "$CONFIG_PATH")
 
 # --------------------------------------------------
 # 5. Validate user configuration
@@ -102,6 +103,16 @@ PRIO=$(validate_number "$PRIO" 0 5 "CPU priority")
 
 [[ "$WORKER" != *$'\n'* && "$WORKER" != *$'\r'* ]] ||
     fail "Invalid worker name"
+
+# Validate TLS mode before starting XMRig.
+
+case "$TLS_MODE" in
+    auto|enabled|disabled)
+        ;;
+    *)
+        fail "Invalid TLS mode: expected auto, enabled or disabled"
+        ;;
+esac
 
 # --------------------------------------------------
 # 6. Parse pool address
@@ -151,15 +162,31 @@ fi
 
 TLS_ARGS=()
 
-# Preserve legacy TLS behavior for now.
-# Explicit TLS configuration will be added later.
+case "$TLS_MODE" in
 
-if (( PORT == 443 )); then
-    TLS_ARGS+=(--tls)
-    log "TLS enabled (legacy port 443 rule)"
-else
-    log "TLS disabled (legacy port rule)"
-fi
+    auto)
+        # Backward-compatible behavior:
+        # TLS is enabled only on port 443.
+        if (( PORT == 443 )); then
+            TLS_ARGS+=(--tls)
+            log "TLS mode: auto (enabled on port 443)"
+        else
+            log "TLS mode: auto (disabled on port ${PORT})"
+        fi
+        ;;
+
+    enabled)
+        # Force TLS regardless of the pool port.
+        TLS_ARGS+=(--tls)
+        log "TLS mode: enabled"
+        ;;
+
+    disabled)
+        # Never enable TLS.
+        log "TLS mode: disabled"
+        ;;
+
+esac
 
 # --------------------------------------------------
 # 8. Detect available memory
