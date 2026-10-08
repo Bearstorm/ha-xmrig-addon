@@ -20,106 +20,135 @@ permissions:
   contents: read
 
 jobs:
+
   # ============================================
-  # 1. RELEASE SECURITY POLICY
+  # 1. SHARED RELEASE SECURITY POLICY
   # ============================================
 
   release-policy:
     name: Validate release policy
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+
     outputs:
       push_image: ${{ steps.policy.outputs.push_image }}
       image_tag: ${{ steps.policy.outputs.image_tag }}
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
+      # ------------------------------------------
+      # Verify shared policy script
+      # ------------------------------------------
+
+      - name: Validate release policy script
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f scripts/release_policy.sh
+
+          bash -n scripts/release_policy.sh
+
+          echo "PASS: Shared release policy syntax"
+
+      # ------------------------------------------
+      # Execute shared release policy
+      # ------------------------------------------
+
       - name: Determine publication permissions
         id: policy
         shell: bash
+
         env:
           EVENT_NAME: ${{ github.event_name }}
           GIT_REF: ${{ github.ref }}
           REF_NAME: ${{ github.ref_name }}
+          EVENT_SHA: ${{ github.sha }}
+
         run: |
           set -euo pipefail
 
-          PUSH_IMAGE=false
-          IMAGE_TAG=development
+          RELEASE_SHA=""
+          MAIN_SHA=""
 
-          # Development builds never publish.
+          # --------------------------------------
+          # Release tag verification
+          # --------------------------------------
 
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            echo "Pull request: build only"
+          if [[ "$EVENT_NAME" == "push" &&
+                "$GIT_REF" == refs/tags/v2.* ]]; then
 
-          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "Manual run: build only"
+            echo "Release tag detected: $REF_NAME"
 
-          elif [[ "$EVENT_NAME" == "push" ]]; then
+            # Fetch the authoritative main branch.
+            git fetch --no-tags origin \
+              +refs/heads/main:refs/remotes/origin/main
 
-            # Stable main branch
-            if [[ "$GIT_REF" == "refs/heads/main" ]]; then
+            # Resolve main to its commit.
+            MAIN_SHA="$(git rev-parse --verify \
+              refs/remotes/origin/main^{commit})"
 
-              PUSH_IMAGE=true
-              IMAGE_TAG=latest
+            # Resolve the checked-out release commit.
+            RELEASE_SHA="$(git rev-parse --verify \
+              HEAD^{commit})"
 
-              echo "Approved main branch push"
+            # Confirm the checked-out commit matches
+            # the GitHub event commit.
+            EVENT_COMMIT="$(git rev-parse --verify \
+              "${EVENT_SHA}^{commit}")"
 
-            # Version 2 release tags
-            elif [[ "$GIT_REF" == refs/tags/v2.* ]]; then
-
-              echo "Validating release tag: $REF_NAME"
-
-              # Supported formats:
-              # v2.0.0
-              # v2.0.0-beta.1
-
-              if [[ ! "$REF_NAME" =~ ^v2\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-beta\.[1-9][0-9]*)?$ ]]; then
-                echo "ERROR: Invalid release tag format"
-                exit 1
-              fi
-
-              # Fetch current stable branch.
-              git fetch --no-tags origin \
-                +refs/heads/main:refs/remotes/origin/main
-
-              MAIN_SHA=$(git rev-parse refs/remotes/origin/main)
-              RELEASE_SHA=$(git rev-parse HEAD)
-
-              echo "Main commit: $MAIN_SHA"
-              echo "Release commit: $RELEASE_SHA"
-
-              # Only the current main commit may be tagged.
-              if [[ "$RELEASE_SHA" != "$MAIN_SHA" ]]; then
-                echo "ERROR: Release tag does not point to current main HEAD"
-                exit 1
-              fi
-
-              PUSH_IMAGE=true
-              IMAGE_TAG="$REF_NAME"
-
-              if [[ "$REF_NAME" == *-beta.* ]]; then
-                echo "Beta release approved"
-              else
-                echo "Stable release approved"
-              fi
-
-            else
-              echo "Development branch: build only"
+            if [[ "$RELEASE_SHA" != "$EVENT_COMMIT" ]]; then
+              echo "ERROR: Release checkout mismatch"
+              exit 1
             fi
+
+            echo "Main SHA: $MAIN_SHA"
+            echo "Release SHA: $RELEASE_SHA"
+
+          else
+
+            echo "Non-release event detected"
 
           fi
 
-          echo "push_image=$PUSH_IMAGE" >> "$GITHUB_OUTPUT"
-          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          # --------------------------------------
+          # Run shared release policy
+          # --------------------------------------
 
+          export EVENT_NAME
+          export GIT_REF
+          export REF_NAME
+          export RELEASE_SHA
+          export MAIN_SHA
+
+          bash scripts/release_policy.sh
+
+      # ------------------------------------------
+      # Display policy outcome
+      # ------------------------------------------
+
+      - name: Display publication policy
+        shell: bash
+        env:
+          PUSH_IMAGE: ${{ steps.policy.outputs.push_image }}
+          IMAGE_TAG: ${{ steps.policy.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "XMRig 2.0 Release Policy"
+          echo "======================================"
           echo "Publish image: $PUSH_IMAGE"
           echo "Image tag: $IMAGE_TAG"
+          echo "======================================"
 
   # ============================================
   # 2. LEGACY SUPERVISED / MSR BUILD
@@ -137,13 +166,18 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout
+
+      - name: Checkout repository
         uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+
+      # ------------------------------------------
+      # Normalize GHCR owner
+      # ------------------------------------------
 
       - name: Compute image owner
         id: owner
@@ -153,8 +187,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          OWNER_LC="$(echo "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          OWNER_LC="$(echo "$REPOSITORY_OWNER" \
+            | tr '[:upper:]' '[:lower:]')"
+
           echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------
+      # Authenticate only for approved publishing
+      # ------------------------------------------
 
       - name: Log in to GHCR
         if: needs.release-policy.outputs.push_image == 'true'
@@ -163,6 +203,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ------------------------------------------
+      # Build and optionally publish legacy image
+      # ------------------------------------------
 
       - name: Build and optionally push Supervised/MSR
         uses: docker/build-push-action@v7
@@ -188,13 +232,18 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout
+
+      - name: Checkout repository
         uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+
+      # ------------------------------------------
+      # Normalize GHCR owner
+      # ------------------------------------------
 
       - name: Compute image owner
         id: owner
@@ -204,8 +253,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          OWNER_LC="$(echo "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          OWNER_LC="$(echo "$REPOSITORY_OWNER" \
+            | tr '[:upper:]' '[:lower:]')"
+
           echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------
+      # Authenticate only for approved publishing
+      # ------------------------------------------
 
       - name: Log in to GHCR
         if: needs.release-policy.outputs.push_image == 'true'
@@ -214,6 +269,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ------------------------------------------
+      # Build and optionally publish HAOS image
+      # ------------------------------------------
 
       - name: Build and optionally push HAOS Safe
         uses: docker/build-push-action@v7
