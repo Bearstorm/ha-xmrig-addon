@@ -1,6 +1,11 @@
 name: XMRig HAOS - Isolated Runtime Test
 
 on:
+  push:
+    branches:
+      - develop-v2
+    paths:
+      - ".github/workflows/runtime-test.yml"
   workflow_dispatch:
 
 permissions:
