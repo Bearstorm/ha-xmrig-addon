@@ -27,6 +27,8 @@ jobs:
 
       - name: Install validation dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
           python -m pip install --disable-pip-version-check pyyaml
 
       - name: Check HAOS startup script syntax
@@ -114,7 +116,23 @@ jobs:
           print("PASS: HAOS configuration safety checks")
           PY
 
+      # --------------------------------------------
+      # Functional startup tests - no actual mining
+      # --------------------------------------------
+
+      - name: Check functional test script syntax
+        shell: bash
+        run: |
+          bash -n tests/test_run.sh
+          echo "Functional test script syntax OK"
+
+      - name: Run HAOS startup functional tests
+        shell: bash
+        run: |
+          bash tests/test_run.sh
+
       - name: Validation summary
         run: |
           echo "XMRig source validation completed."
-          echo "Runtime and mining tests are not included yet."
+          echo "HAOS startup functional tests completed."
+          echo "Docker runtime and real mining are not tested."
