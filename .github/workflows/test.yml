@@ -22,26 +22,54 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           persist-credentials: false
 
+      # ------------------------------------------
+      # 2. Install validation dependencies
+      # ------------------------------------------
+
       - name: Install validation dependencies
+        shell: bash
         run: |
+          set -euo pipefail
+
           sudo apt-get update
           sudo apt-get install -y jq
-          python -m pip install --disable-pip-version-check pyyaml
+
+          python -m pip install \
+            --disable-pip-version-check \
+            pyyaml
+
+      # ------------------------------------------
+      # 3. Validate startup scripts
+      # ------------------------------------------
 
       - name: Check HAOS startup script syntax
+        shell: bash
         run: |
+          set -euo pipefail
+
           bash -n xmrig_haos/rootfs/run.sh
-          echo "HAOS startup script syntax OK"
+          echo "PASS: HAOS startup script syntax"
 
       - name: Check legacy startup script syntax
+        shell: bash
         run: |
+          set -euo pipefail
+
           bash -n xmrig/rootfs/run.sh
-          echo "Legacy startup script syntax OK"
+          echo "PASS: Legacy startup script syntax"
+
+      # ------------------------------------------
+      # 4. Validate add-on configurations
+      # ------------------------------------------
 
       - name: Validate addon YAML files
         shell: bash
@@ -86,9 +114,15 @@ jobs:
 
           PY
 
+      # ------------------------------------------
+      # 5. Verify HAOS Dockerfile
+      # ------------------------------------------
+
       - name: Verify HAOS Dockerfile
         shell: bash
         run: |
+          set -euo pipefail
+
           test -f xmrig_haos/Dockerfile
           test -f xmrig_haos/rootfs/run.sh
 
@@ -96,7 +130,11 @@ jobs:
           grep -q 'sha256sum -c' xmrig_haos/Dockerfile
           grep -q 'ENTRYPOINT' xmrig_haos/Dockerfile
 
-          echo "HAOS Dockerfile basic checks OK"
+          echo "PASS: HAOS Dockerfile basic checks"
+
+      # ------------------------------------------
+      # 6. Verify HAOS safe architecture
+      # ------------------------------------------
 
       - name: Verify safe architecture
         shell: bash
@@ -118,23 +156,73 @@ jobs:
           print("PASS: HAOS configuration safety checks")
           PY
 
-      # --------------------------------------------
-      # Functional startup tests - no actual mining
-      # --------------------------------------------
+      # ------------------------------------------
+      # 7. Validate functional test scripts
+      # ------------------------------------------
 
       - name: Check functional test script syntax
         shell: bash
         run: |
+          set -euo pipefail
+
           bash -n tests/test_run.sh
-          echo "Functional test script syntax OK"
+          echo "PASS: Functional test script syntax"
+
+      # ------------------------------------------
+      # 8. Run XMRig functional tests
+      # ------------------------------------------
 
       - name: Run HAOS startup functional tests
         shell: bash
         run: |
+          set -euo pipefail
+
           bash tests/test_run.sh
 
-      - name: Validation summary
+      # ------------------------------------------
+      # 9. Validate release policy scripts
+      # ------------------------------------------
+
+      - name: Check release policy script syntax
+        shell: bash
         run: |
-          echo "XMRig source validation completed."
-          echo "HAOS startup functional tests completed."
-          echo "Docker runtime and real mining are not tested."
+          set -euo pipefail
+
+          test -f scripts/release_policy.sh
+          test -f tests/test_release_policy.sh
+
+          bash -n scripts/release_policy.sh
+          bash -n tests/test_release_policy.sh
+
+          echo "PASS: Release policy script syntax"
+
+      # ------------------------------------------
+      # 10. Run release policy security tests
+      # ------------------------------------------
+
+      - name: Run release policy security tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash tests/test_release_policy.sh
+
+      # ------------------------------------------
+      # 11. Validation summary
+      # ------------------------------------------
+
+      - name: Validation summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "XMRig 2.0 Validation Summary"
+          echo "======================================"
+          echo "HAOS startup functional scenarios: 20"
+          echo "Release policy security scenarios: 16"
+          echo "Expected total scenarios: 36"
+          echo "======================================"
+          echo "All preceding validation steps passed."
+          echo "Real mining is not performed."
+          echo "Docker runtime is tested separately."
