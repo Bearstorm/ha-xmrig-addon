@@ -1,44 +1,61 @@
 
 #!/bin/bash
-
 set -euo pipefail
-
-echo "[xmrig-addon] Starting XMRig HAOS Safe..."
-echo "[xmrig-addon] XMRig core: 6.26.0"
-
-CONFIG_PATH="/data/options.json"
 
 # --------------------------------------------------
 # 1. Logging and error handling
 # --------------------------------------------------
 
 log() {
-    echo "[xmrig-addon] $*"
+    printf '[xmrig-addon] %s\n' "$*"
 }
 
-error() {
-    echo "[xmrig-addon] ERROR: $*" >&2
+fail() {
+    printf '[xmrig-addon] ERROR: %s\n' "$*" >&2
     exit 1
 }
 
 # --------------------------------------------------
-# 2. Check dependencies and configuration
+# 2. Production paths and isolated test mode
+# --------------------------------------------------
+
+CONFIG_PATH=/data/options.json
+XMRIG_BIN=/usr/bin/xmrig
+MEMINFO_PATH=/proc/meminfo
+CGROUP_MAX_PATH=/sys/fs/cgroup/memory.max
+CGROUP_CURRENT_PATH=/sys/fs/cgroup/memory.current
+
+# Test mode is opt-in and not configured by the add-on.
+# It must only be used in an isolated test environment.
+
+if [[ "${XMRIG_TEST_MODE:-0}" == 1 ]]; then
+    CONFIG_PATH="${XMRIG_TEST_CONFIG:?Missing test configuration path}"
+    XMRIG_BIN="${XMRIG_TEST_BINARY:?Missing test executable path}"
+    MEMINFO_PATH="${XMRIG_TEST_MEMINFO:?Missing test meminfo path}"
+    CGROUP_MAX_PATH="${XMRIG_TEST_CGROUP_MAX:?Missing test cgroup max path}"
+    CGROUP_CURRENT_PATH="${XMRIG_TEST_CGROUP_CURRENT:?Missing test cgroup current path}"
+
+    log "TEST MODE: substituting paths; no real miner should be configured here"
+fi
+
+# --------------------------------------------------
+# 3. Validate dependencies and configuration
 # --------------------------------------------------
 
 command -v jq >/dev/null 2>&1 ||
-    error "jq is not installed"
+    fail "jq is not installed"
 
-command -v xmrig >/dev/null 2>&1 ||
-    error "XMRig binary not found"
+[[ -x "$XMRIG_BIN" ]] ||
+    fail "XMRig executable not found"
 
-[ -f "$CONFIG_PATH" ] ||
-    error "Configuration file not found: $CONFIG_PATH"
+[[ -f "$CONFIG_PATH" ]] ||
+    fail "Configuration file is missing"
 
 jq -e 'type == "object"' "$CONFIG_PATH" >/dev/null ||
-    error "Invalid JSON configuration"
+    fail "Invalid JSON configuration"
 
 # --------------------------------------------------
-# 3. Load options
+# 4. Load configuration
 # --------------------------------------------------
 
 POOL=$(jq -r '.pool // ""' "$CONFIG_PATH")
@@ -49,96 +66,94 @@ THREADS=$(jq -r '.threads // 2' "$CONFIG_PATH")
 PRIO=$(jq -r '.priority // 2' "$CONFIG_PATH")
 
 # --------------------------------------------------
-# 4. Validate configuration
+# 5. Validate user configuration
 # --------------------------------------------------
 
-[[ -n "$POOL" ]] ||
-    error "Mining pool is empty"
+[[ -n "$POOL" && "$POOL" != null ]] ||
+    fail "Mining pool is empty"
 
-[[ -n "$WALLET" ]] ||
-    error "Wallet address is empty"
+[[ -n "$WALLET" && "$WALLET" != null ]] ||
+    fail "Wallet address is empty"
 
-[[ "$PORT" =~ ^[0-9]+$ ]] ||
-    error "Invalid pool port"
+[[ "$POOL" != *[[:space:]]* ]] ||
+    fail "Pool address contains whitespace"
 
-(( 10#$PORT >= 1 && 10#$PORT <= 65535 )) ||
-    error "Pool port must be between 1 and 65535"
+[[ "$POOL" != *'@'* && "$POOL" != *'?'* && "$POOL" != *'#'* ]] ||
+    fail "Pool address contains unexpected characters"
 
-[[ "$THREADS" =~ ^[0-9]+$ ]] ||
-    error "Invalid CPU thread count"
+validate_number() {
+    local value=$1 min=$2 max=$3 label=$4
+    local max_digits=${#max}
 
-(( 10#$THREADS >= 1 && 10#$THREADS <= 256 )) ||
-    error "CPU threads must be between 1 and 256"
+    [[ "$value" =~ ^[0-9]+$ && ${#value} -le $max_digits ]] ||
+        fail "Invalid $label"
 
-[[ "$PRIO" =~ ^[0-9]+$ ]] ||
-    error "Invalid CPU priority"
+    local number=$((10#$value))
 
-(( 10#$PRIO >= 0 && 10#$PRIO <= 5 )) ||
-    error "CPU priority must be between 0 and 5"
+    (( number >= min && number <= max )) ||
+        fail "$label must be between $min and $max"
 
-# Normalize numerical options
-PORT=$((10#$PORT))
-THREADS=$((10#$THREADS))
-PRIO=$((10#$PRIO))
+    printf '%s' "$number"
+}
+
+PORT=$(validate_number "$PORT" 1 65535 "pool port")
+THREADS=$(validate_number "$THREADS" 1 256 "CPU threads")
+PRIO=$(validate_number "$PRIO" 0 5 "CPU priority")
+
+[[ "$WORKER" != *$'\n'* && "$WORKER" != *$'\r'* ]] ||
+    fail "Invalid worker name"
 
 # --------------------------------------------------
-# 5. Parse pool address
+# 6. Parse pool address
 # --------------------------------------------------
 
-POOL_CLEAN="$POOL"
+# Accept:
+# hostname
+# hostname:port
+# [IPv6]
+# [IPv6]:port
+#
+# An explicit port option always takes precedence.
 
-# Accept plain hostnames and URLs with a scheme
-if [[ "$POOL_CLEAN" == *"://"* ]]; then
-    POOL_CLEAN="${POOL_CLEAN#*://}"
+POOL_HOST=$POOL
+
+if [[ "$POOL_HOST" == *://* ]]; then
+    POOL_HOST=${POOL_HOST#*://}
 fi
 
-# Remove trailing slash
-POOL_CLEAN="${POOL_CLEAN%/}"
+POOL_HOST=${POOL_HOST%/}
 
-# Do not allow URL paths
-[[ "$POOL_CLEAN" != */* ]] ||
-    error "Mining pool must not contain a URL path"
+[[ "$POOL_HOST" != */* ]] ||
+    fail "Pool address must not contain a path"
 
-POOL_HOST="$POOL_CLEAN"
+if [[ "$POOL_HOST" == \[* ]]; then
 
-# Support hostname:port and bracketed IPv6
-if [[ "$POOL_CLEAN" == \[*\]* ]]; then
-    POOL_HOST="${POOL_CLEAN%%]*}]"
-
-    if [[ "$POOL_CLEAN" =~ ^\[([^]]+)\]:([0-9]+)$ ]]; then
+    if [[ "$POOL_HOST" =~ ^\[([^]]+)\](:([0-9]+))?$ ]]; then
         POOL_HOST="[${BASH_REMATCH[1]}]"
-        log "Embedded pool port detected; using configured port"
-    elif [[ "$POOL_CLEAN" =~ ^\[([^]]+)\]$ ]]; then
-        POOL_HOST="$POOL_CLEAN"
     else
-        error "Invalid IPv6 pool address"
+        fail "Invalid bracketed IPv6 pool address"
     fi
 
-elif [[ "$POOL_CLEAN" == *:* ]]; then
-    POOL_HOST="${POOL_CLEAN%%:*}"
-    log "Embedded pool port detected; using configured port"
+elif [[ "$POOL_HOST" == *:* ]]; then
+
+    [[ "$POOL_HOST" == *:* && "$POOL_HOST" != *:*:* ]] ||
+        fail "IPv6 addresses must use brackets"
+
+    POOL_HOST=${POOL_HOST%%:*}
 fi
 
-[[ -n "$POOL_HOST" ]] ||
-    error "Mining pool hostname is empty"
-
-[[ "$POOL_HOST" != *[[:space:]]* ]] ||
-    error "Mining pool hostname contains whitespace"
-
-log "Pool: ${POOL_HOST}:${PORT}"
-log "Worker: ${WORKER}"
-log "CPU threads: ${THREADS}"
-log "CPU priority: ${PRIO}"
-
-# Wallet and other credentials are never logged.
+[[ -n "$POOL_HOST" && "$POOL_HOST" != *[[:space:]]* ]] ||
+    fail "Invalid pool hostname"
 
 # --------------------------------------------------
-# 6. Configure TLS
+# 7. Configure TLS
 # --------------------------------------------------
 
 TLS_ARGS=()
 
-# Legacy behavior; configurable TLS comes next.
+# Preserve legacy TLS behavior for now.
+# Explicit TLS configuration will be added later.
+
 if (( PORT == 443 )); then
     TLS_ARGS+=(--tls)
     log "TLS enabled (legacy port 443 rule)"
@@ -147,10 +162,72 @@ else
 fi
 
 # --------------------------------------------------
-# 7. Safe XMRig options
+# 8. Detect available memory
 # --------------------------------------------------
 
-XMRIG_ARGS=(
+AVAILABLE_BYTES=0
+
+if [[ -r "$MEMINFO_PATH" ]]; then
+
+    MEM_KB=$(awk '/^MemAvailable:/ {print $2; exit}' "$MEMINFO_PATH")
+
+    if [[ "$MEM_KB" =~ ^[0-9]+$ && ${#MEM_KB} -le 15 ]]; then
+        AVAILABLE_BYTES=$((MEM_KB * 1024))
+    fi
+fi
+
+# Respect cgroup v2 memory limits when present.
+
+if [[ -r "$CGROUP_MAX_PATH" && -r "$CGROUP_CURRENT_PATH" ]]; then
+
+    CGROUP_MAX=$(<"$CGROUP_MAX_PATH")
+    CGROUP_USED=$(<"$CGROUP_CURRENT_PATH")
+
+    if [[ "$CGROUP_MAX" =~ ^[0-9]+$ &&
+          "$CGROUP_USED" =~ ^[0-9]+$ &&
+          ${#CGROUP_MAX} -le 18 &&
+          ${#CGROUP_USED} -le 18 ]]; then
+
+        CGROUP_AVAILABLE=0
+
+        if (( CGROUP_MAX > CGROUP_USED )); then
+            CGROUP_AVAILABLE=$((CGROUP_MAX - CGROUP_USED))
+        fi
+
+        if (( AVAILABLE_BYTES == 0 ||
+              CGROUP_AVAILABLE < AVAILABLE_BYTES )); then
+
+            AVAILABLE_BYTES=$CGROUP_AVAILABLE
+        fi
+    fi
+fi
+
+# --------------------------------------------------
+# 9. Select RandomX mode
+# --------------------------------------------------
+
+FAST_MIN_BYTES=$((3 * 1024 * 1024 * 1024))
+
+if (( AVAILABLE_BYTES >= FAST_MIN_BYTES )); then
+    RANDOMX_MODE=fast
+else
+    RANDOMX_MODE=light
+fi
+
+# --------------------------------------------------
+# 10. Prepare miner arguments
+# --------------------------------------------------
+
+log "Pool: ${POOL_HOST}:${PORT}"
+log "Worker: $WORKER"
+log "CPU threads: $THREADS; priority: $PRIO"
+log "Available memory: $((AVAILABLE_BYTES / 1024 / 1024)) MiB"
+log "RandomX mode: $RANDOMX_MODE"
+log "MSR and huge pages: disabled"
+
+# Never print wallet credentials to the log.
+
+ARGS=(
     --url "${POOL_HOST}:${PORT}"
     --user "$WALLET"
     --pass "$WORKER"
@@ -160,81 +237,16 @@ XMRIG_ARGS=(
     --randomx-no-rdmsr
     --no-huge-pages
     --keepalive
+    --randomx-mode="$RANDOMX_MODE"
 )
 
-XMRIG_ARGS+=("${TLS_ARGS[@]}")
+ARGS+=("${TLS_ARGS[@]}")
 
 # --------------------------------------------------
-# 8. Detect available system memory
+# 11. Start XMRig
 # --------------------------------------------------
 
-# FAST needs approximately 2.3 GB for RandomX.
-# Reserve additional memory for the operating system.
-FAST_MIN_BYTES=$((3 * 1024 * 1024 * 1024))
+# In production, this executes /usr/bin/xmrig.
+# In isolated tests, a mock executable is used.
 
-AVAILABLE_BYTES=0
-
-if [[ -r /proc/meminfo ]]; then
-    MEM_KB=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
-
-    if [[ "$MEM_KB" =~ ^[0-9]+$ ]]; then
-        AVAILABLE_BYTES=$((MEM_KB * 1024))
-    fi
-fi
-
-# Respect cgroup v2 memory limits when present.
-if [[ -r /sys/fs/cgroup/memory.max &&
-      -r /sys/fs/cgroup/memory.current ]]; then
-
-    CGROUP_MAX=$(cat /sys/fs/cgroup/memory.max)
-    CGROUP_USED=$(cat /sys/fs/cgroup/memory.current)
-
-    if [[ "$CGROUP_MAX" =~ ^[0-9]+$ &&
-          "$CGROUP_USED" =~ ^[0-9]+$ ]]; then
-
-        if (( CGROUP_MAX > CGROUP_USED )); then
-            CGROUP_AVAILABLE=$((CGROUP_MAX - CGROUP_USED))
-        else
-            CGROUP_AVAILABLE=0
-        fi
-
-        if (( AVAILABLE_BYTES == 0 ||
-              CGROUP_AVAILABLE < AVAILABLE_BYTES )); then
-            AVAILABLE_BYTES=$CGROUP_AVAILABLE
-        fi
-    fi
-fi
-
-AVAILABLE_MB=$((AVAILABLE_BYTES / 1024 / 1024))
-
-log "Detected available memory: ${AVAILABLE_MB} MiB"
-
-# --------------------------------------------------
-# 9. Select RandomX mode before starting
-# --------------------------------------------------
-
-if (( AVAILABLE_BYTES >= FAST_MIN_BYTES )); then
-    RANDOMX_MODE="fast"
-    log "Selected RandomX FAST mode"
-else
-    RANDOMX_MODE="light"
-    log "Selected RandomX LIGHT mode"
-    log "Reason: available memory below 3 GiB or unknown"
-fi
-
-XMRIG_ARGS+=("--randomx-mode=${RANDOMX_MODE}")
-
-# --------------------------------------------------
-# 10. Start miner
-# --------------------------------------------------
-
-log "Starting XMRig..."
-log "RandomX mode: ${RANDOMX_MODE}"
-log "MSR optimization: disabled"
-log "Huge pages: disabled"
-
-# Do not automatically switch modes after a crash.
-# Configuration, network and runtime errors must
-# remain visible for diagnosis.
-
-exec /usr/bin/xmrig "${XMRIG_ARGS[@]}"
+exec "$XMRIG_BIN" "${ARGS[@]}"
