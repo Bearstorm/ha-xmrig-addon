@@ -1,89 +1,240 @@
 
-#!/bin/sh
+#!/bin/bash
 
-echo "[xmrig-addon] run.sh script started..."
+set -euo pipefail
 
-# Nastavíme len -u, aby sme mohli zachytiť pád Step 1
-set -u
+echo "[xmrig-addon] Starting XMRig HAOS Safe..."
+echo "[xmrig-addon] XMRig core: 6.26.0"
 
 CONFIG_PATH="/data/options.json"
 
-# Načítanie premenných cez jq
+# --------------------------------------------------
+# 1. Logging and error handling
+# --------------------------------------------------
+
+log() {
+    echo "[xmrig-addon] $*"
+}
+
+error() {
+    echo "[xmrig-addon] ERROR: $*" >&2
+    exit 1
+}
+
+# --------------------------------------------------
+# 2. Check dependencies and configuration
+# --------------------------------------------------
+
+command -v jq >/dev/null 2>&1 ||
+    error "jq is not installed"
+
+command -v xmrig >/dev/null 2>&1 ||
+    error "XMRig binary not found"
+
+[ -f "$CONFIG_PATH" ] ||
+    error "Configuration file not found: $CONFIG_PATH"
+
+jq -e 'type == "object"' "$CONFIG_PATH" >/dev/null ||
+    error "Invalid JSON configuration"
+
+# --------------------------------------------------
+# 3. Load options
+# --------------------------------------------------
+
 POOL=$(jq -r '.pool // ""' "$CONFIG_PATH")
 PORT=$(jq -r '.port // 0' "$CONFIG_PATH")
 WALLET=$(jq -r '.wallet // ""' "$CONFIG_PATH")
 WORKER=$(jq -r '.worker // ""' "$CONFIG_PATH")
-THREADS=$(jq -r '.threads // 0' "$CONFIG_PATH")
-PRIO=$(jq -r '.priority // 0' "$CONFIG_PATH")
+THREADS=$(jq -r '.threads // 2' "$CONFIG_PATH")
+PRIO=$(jq -r '.priority // 2' "$CONFIG_PATH")
 
-# Čistenie a príprava URL
-POOL_CLEAN=$(echo "$POOL" | sed 's#^[a-zA-Z0-9+.-]*://##')
+# --------------------------------------------------
+# 4. Validate configuration
+# --------------------------------------------------
+
+[[ -n "$POOL" ]] ||
+    error "Mining pool is empty"
+
+[[ -n "$WALLET" ]] ||
+    error "Wallet address is empty"
+
+[[ "$PORT" =~ ^[0-9]+$ ]] ||
+    error "Invalid pool port"
+
+(( 10#$PORT >= 1 && 10#$PORT <= 65535 )) ||
+    error "Pool port must be between 1 and 65535"
+
+[[ "$THREADS" =~ ^[0-9]+$ ]] ||
+    error "Invalid CPU thread count"
+
+(( 10#$THREADS >= 1 && 10#$THREADS <= 256 )) ||
+    error "CPU threads must be between 1 and 256"
+
+[[ "$PRIO" =~ ^[0-9]+$ ]] ||
+    error "Invalid CPU priority"
+
+(( 10#$PRIO >= 0 && 10#$PRIO <= 5 )) ||
+    error "CPU priority must be between 0 and 5"
+
+# Normalize numerical options
+PORT=$((10#$PORT))
+THREADS=$((10#$THREADS))
+PRIO=$((10#$PRIO))
+
+# --------------------------------------------------
+# 5. Parse pool address
+# --------------------------------------------------
+
+POOL_CLEAN="$POOL"
+
+# Accept plain hostnames and URLs with a scheme
+if [[ "$POOL_CLEAN" == *"://"* ]]; then
+    POOL_CLEAN="${POOL_CLEAN#*://}"
+fi
+
+# Remove trailing slash
+POOL_CLEAN="${POOL_CLEAN%/}"
+
+# Do not allow URL paths
+[[ "$POOL_CLEAN" != */* ]] ||
+    error "Mining pool must not contain a URL path"
+
 POOL_HOST="$POOL_CLEAN"
-POOL_PORT_FROM_POOL=""
 
-if echo "$POOL_CLEAN" | grep -q ':'; then
-  POOL_HOST=$(echo "$POOL_CLEAN" | awk -F: '{print $1}')
-  POOL_PORT_FROM_POOL=$(echo "$POOL_CLEAN" | awk -F: '{print $2}')
+# Support hostname:port and bracketed IPv6
+if [[ "$POOL_CLEAN" == \[*\]* ]]; then
+    POOL_HOST="${POOL_CLEAN%%]*}]"
+
+    if [[ "$POOL_CLEAN" =~ ^\[([^]]+)\]:([0-9]+)$ ]]; then
+        POOL_HOST="[${BASH_REMATCH[1]}]"
+        log "Embedded pool port detected; using configured port"
+    elif [[ "$POOL_CLEAN" =~ ^\[([^]]+)\]$ ]]; then
+        POOL_HOST="$POOL_CLEAN"
+    else
+        error "Invalid IPv6 pool address"
+    fi
+
+elif [[ "$POOL_CLEAN" == *:* ]]; then
+    POOL_HOST="${POOL_CLEAN%%:*}"
+    log "Embedded pool port detected; using configured port"
 fi
 
-if [ "$PORT" -gt 0 ] 2>/dev/null; then
-  POOL_PORT="$PORT"
-elif [ -n "$POOL_PORT_FROM_POOL" ]; then
-  POOL_PORT="$POOL_PORT_FROM_POOL"
+[[ -n "$POOL_HOST" ]] ||
+    error "Mining pool hostname is empty"
+
+[[ "$POOL_HOST" != *[[:space:]]* ]] ||
+    error "Mining pool hostname contains whitespace"
+
+log "Pool: ${POOL_HOST}:${PORT}"
+log "Worker: ${WORKER}"
+log "CPU threads: ${THREADS}"
+log "CPU priority: ${PRIO}"
+
+# Wallet and other credentials are never logged.
+
+# --------------------------------------------------
+# 6. Configure TLS
+# --------------------------------------------------
+
+TLS_ARGS=()
+
+# Legacy behavior; configurable TLS comes next.
+if (( PORT == 443 )); then
+    TLS_ARGS+=(--tls)
+    log "TLS enabled (legacy port 443 rule)"
 else
-  POOL_PORT="3333"
+    log "TLS disabled (legacy port rule)"
 fi
 
-if [ -z "$POOL_HOST" ] || [ "$POOL_HOST" = "null" ]; then
-  echo "[xmrig-addon] ERROR: pool is empty"
-  exit 1
+# --------------------------------------------------
+# 7. Safe XMRig options
+# --------------------------------------------------
+
+XMRIG_ARGS=(
+    --url "${POOL_HOST}:${PORT}"
+    --user "$WALLET"
+    --pass "$WORKER"
+    --threads="$THREADS"
+    --cpu-priority="$PRIO"
+    --randomx-wrmsr=-1
+    --randomx-no-rdmsr
+    --no-huge-pages
+    --keepalive
+)
+
+XMRIG_ARGS+=("${TLS_ARGS[@]}")
+
+# --------------------------------------------------
+# 8. Detect available system memory
+# --------------------------------------------------
+
+# FAST needs approximately 2.3 GB for RandomX.
+# Reserve additional memory for the operating system.
+FAST_MIN_BYTES=$((3 * 1024 * 1024 * 1024))
+
+AVAILABLE_BYTES=0
+
+if [[ -r /proc/meminfo ]]; then
+    MEM_KB=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+
+    if [[ "$MEM_KB" =~ ^[0-9]+$ ]]; then
+        AVAILABLE_BYTES=$((MEM_KB * 1024))
+    fi
 fi
 
-if [ -z "$WALLET" ] || [ "$WALLET" = "null" ]; then
-  echo "[xmrig-addon] ERROR: wallet is empty"
-  exit 1
+# Respect cgroup v2 memory limits when present.
+if [[ -r /sys/fs/cgroup/memory.max &&
+      -r /sys/fs/cgroup/memory.current ]]; then
+
+    CGROUP_MAX=$(cat /sys/fs/cgroup/memory.max)
+    CGROUP_USED=$(cat /sys/fs/cgroup/memory.current)
+
+    if [[ "$CGROUP_MAX" =~ ^[0-9]+$ &&
+          "$CGROUP_USED" =~ ^[0-9]+$ ]]; then
+
+        if (( CGROUP_MAX > CGROUP_USED )); then
+            CGROUP_AVAILABLE=$((CGROUP_MAX - CGROUP_USED))
+        else
+            CGROUP_AVAILABLE=0
+        fi
+
+        if (( AVAILABLE_BYTES == 0 ||
+              CGROUP_AVAILABLE < AVAILABLE_BYTES )); then
+            AVAILABLE_BYTES=$CGROUP_AVAILABLE
+        fi
+    fi
 fi
 
-echo "[xmrig-addon] (HAOS Safe) Starting XMRig on ${POOL_HOST}:${POOL_PORT}"
+AVAILABLE_MB=$((AVAILABLE_BYTES / 1024 / 1024))
 
-# Dynamické argumenty
-TLS_ARGS=""
-[ "$POOL_PORT" = "443" ] && TLS_ARGS="--tls"
+log "Detected available memory: ${AVAILABLE_MB} MiB"
 
-THREAD_ARGS=""
-[ "$THREADS" -gt 0 ] && THREAD_ARGS="--threads=${THREADS}"
+# --------------------------------------------------
+# 9. Select RandomX mode before starting
+# --------------------------------------------------
 
-PRIO_ARGS=""
-[ "$PRIO" -gt 0 ] && PRIO_ARGS="--cpu-priority=${PRIO}"
-
-# --- TO NAJDÔLEŽITEJŠIE: SAFE ARGUMENTY (prevzaté z tvojho funkčného skriptu) ---
-# Vypneme všetko, čo v Safe móde nejde, aby neboli errory v logu
-SAFE_MSR_ARGS="--randomx-wrmsr=0 --randomx-no-rdmsr --randomx-init=0 --no-huge-pages --keepalive"
-
-echo "[xmrig-addon] Step 1: Trying FAST mode (2.3 GB RAM)..."
-
-# Prvý pokus - FAST
-/usr/bin/xmrig \
-  --url "${POOL_HOST}:${POOL_PORT}" \
-  --user "$WALLET" \
-  --pass "$WORKER" \
-  $TLS_ARGS \
-  $THREAD_ARGS \
-  $PRIO_ARGS \
-  $SAFE_MSR_ARGS \
-  --randomx-mode=fast
-
-# Ak prvý pokus zlyhal (málo RAM), prepni na LIGHT
-if [ $? -ne 0 ]; then
-  echo "[xmrig-addon] FAST mode failed. Falling back to LIGHT mode..."
-  
-  exec /usr/bin/xmrig \
-    --url "${POOL_HOST}:${POOL_PORT}" \
-    --user "$WALLET" \
-    --pass "$WORKER" \
-    $TLS_ARGS \
-    $THREAD_ARGS \
-    $PRIO_ARGS \
-    $SAFE_MSR_ARGS \
-    --randomx-mode=light
+if (( AVAILABLE_BYTES >= FAST_MIN_BYTES )); then
+    RANDOMX_MODE="fast"
+    log "Selected RandomX FAST mode"
+else
+    RANDOMX_MODE="light"
+    log "Selected RandomX LIGHT mode"
+    log "Reason: available memory below 3 GiB or unknown"
 fi
+
+XMRIG_ARGS+=("--randomx-mode=${RANDOMX_MODE}")
+
+# --------------------------------------------------
+# 10. Start miner
+# --------------------------------------------------
+
+log "Starting XMRig..."
+log "RandomX mode: ${RANDOMX_MODE}"
+log "MSR optimization: disabled"
+log "Huge pages: disabled"
+
+# Do not automatically switch modes after a crash.
+# Configuration, network and runtime errors must
+# remain visible for diagnosis.
+
+exec /usr/bin/xmrig "${XMRIG_ARGS[@]}"
