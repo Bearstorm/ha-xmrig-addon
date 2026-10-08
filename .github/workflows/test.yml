@@ -1,0 +1,228 @@
+
+name: XMRig Addon - Validation Tests
+
+on:
+  push:
+    branches:
+      - develop-v2
+
+  pull_request:
+    branches:
+      - main
+      - develop-v2
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate addon source files
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # ------------------------------------------
+      # 2. Install validation dependencies
+      # ------------------------------------------
+
+      - name: Install validation dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+          python -m pip install \
+            --disable-pip-version-check \
+            pyyaml
+
+      # ------------------------------------------
+      # 3. Validate startup scripts
+      # ------------------------------------------
+
+      - name: Check HAOS startup script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash -n xmrig_haos/rootfs/run.sh
+          echo "PASS: HAOS startup script syntax"
+
+      - name: Check legacy startup script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash -n xmrig/rootfs/run.sh
+          echo "PASS: Legacy startup script syntax"
+
+      # ------------------------------------------
+      # 4. Validate add-on configurations
+      # ------------------------------------------
+
+      - name: Validate addon YAML files
+        shell: bash
+        run: |
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+
+          for directory in ("xmrig", "xmrig_haos"):
+              path = Path(directory) / "config.yaml"
+
+              with path.open(encoding="utf-8") as stream:
+                  config = yaml.safe_load(stream)
+
+              assert isinstance(config, dict), (
+                  f"{path}: root must be a mapping"
+              )
+
+              required = (
+                  "name",
+                  "slug",
+                  "version",
+                  "arch",
+                  "options",
+                  "schema",
+              )
+
+              for key in required:
+                  assert key in config, (
+                      f"{path}: missing required key {key}"
+                  )
+
+              assert isinstance(config["options"], dict)
+              assert isinstance(config["schema"], dict)
+
+              for option in config["options"]:
+                  assert option in config["schema"], (
+                      f"{path}: option {option} has no schema"
+                  )
+
+              print(f"PASS: {path}")
+
+          PY
+
+      # ------------------------------------------
+      # 5. Verify HAOS Dockerfile
+      # ------------------------------------------
+
+      - name: Verify HAOS Dockerfile
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f xmrig_haos/Dockerfile
+          test -f xmrig_haos/rootfs/run.sh
+
+          grep -q 'XMRIG_SHA256' xmrig_haos/Dockerfile
+          grep -q 'sha256sum -c' xmrig_haos/Dockerfile
+          grep -q 'ENTRYPOINT' xmrig_haos/Dockerfile
+
+          echo "PASS: HAOS Dockerfile basic checks"
+
+      # ------------------------------------------
+      # 6. Verify HAOS safe architecture
+      # ------------------------------------------
+
+      - name: Verify safe architecture
+        shell: bash
+        run: |
+          python - <<'PY'
+          import yaml
+
+          with open(
+              "xmrig_haos/config.yaml",
+              encoding="utf-8"
+          ) as stream:
+              config = yaml.safe_load(stream)
+
+          assert config.get("full_access", False) is False
+          assert config.get("host_network", False) is False
+          assert config.get("host_pid", False) is False
+          assert config.get("apparmor", True) is not False
+
+          print("PASS: HAOS configuration safety checks")
+          PY
+
+      # ------------------------------------------
+      # 7. Validate functional test scripts
+      # ------------------------------------------
+
+      - name: Check functional test script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash -n tests/test_run.sh
+          echo "PASS: Functional test script syntax"
+
+      # ------------------------------------------
+      # 8. Run XMRig functional tests
+      # ------------------------------------------
+
+      - name: Run HAOS startup functional tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash tests/test_run.sh
+
+      # ------------------------------------------
+      # 9. Validate release policy scripts
+      # ------------------------------------------
+
+      - name: Check release policy script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f scripts/release_policy.sh
+          test -f tests/test_release_policy.sh
+
+          bash -n scripts/release_policy.sh
+          bash -n tests/test_release_policy.sh
+
+          echo "PASS: Release policy script syntax"
+
+      # ------------------------------------------
+      # 10. Run release policy security tests
+      # ------------------------------------------
+
+      - name: Run release policy security tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash tests/test_release_policy.sh
+
+      # ------------------------------------------
+      # 11. Validation summary
+      # ------------------------------------------
+
+      - name: Validation summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "XMRig 2.0 Validation Summary"
+          echo "======================================"
+          echo "HAOS startup functional scenarios: 20"
+          echo "Release policy security scenarios: 16"
+          echo "Expected total scenarios: 36"
+          echo "======================================"
+          echo "All preceding validation steps passed."
+          echo "Real mining is not performed."
+          echo "Docker runtime is tested separately."

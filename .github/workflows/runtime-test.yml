@@ -1,0 +1,201 @@
+
+name: XMRig HAOS - Isolated Runtime Test
+
+on:
+  push:
+    branches:
+      - develop-v2
+    paths:
+      - ".github/workflows/runtime-test.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-test:
+    name: Test XMRig binary without mining
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+      # ------------------------------------------
+      # 1. Checkout source code
+      # ------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # ------------------------------------------
+      # 2. Prepare Docker Buildx
+      # ------------------------------------------
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # ------------------------------------------
+      # 3. Build HAOS image locally
+      # ------------------------------------------
+
+      - name: Build HAOS Safe runtime image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./xmrig_haos
+          load: true
+          push: false
+          tags: xmrig-haos-runtime-test:local
+
+      # ------------------------------------------
+      # 4. Inspect locally built image
+      # ------------------------------------------
+
+      - name: Inspect Docker image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker image inspect \
+            xmrig-haos-runtime-test:local \
+            --format \
+            'Image ID: {{.Id}}'
+
+          docker image inspect \
+            xmrig-haos-runtime-test:local \
+            --format \
+            'Architecture: {{.Architecture}}'
+
+      # ------------------------------------------
+      # 5. Verify XMRig version
+      # ------------------------------------------
+
+      - name: Verify actual XMRig version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /usr/bin/xmrig \
+            xmrig-haos-runtime-test:local \
+            --version 2>&1 | tee xmrig-version.txt
+
+          grep -Fq "6.26.0" xmrig-version.txt
+
+          echo "PASS: XMRig 6.26.0 version verified"
+
+      # ------------------------------------------
+      # 6. Verify supported CLI options
+      # ------------------------------------------
+
+      - name: Verify supported command-line options
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /usr/bin/xmrig \
+            xmrig-haos-runtime-test:local \
+            --help > xmrig-help.txt 2>&1
+
+          for option in \
+            "--url" \
+            "--user" \
+            "--pass" \
+            "--threads" \
+            "--cpu-priority" \
+            "--randomx-wrmsr" \
+            "--randomx-no-rdmsr" \
+            "--no-huge-pages" \
+            "--keepalive" \
+            "--randomx-mode" \
+            "--tls"
+          do
+            if grep -Fq -- "$option" xmrig-help.txt; then
+              echo "PASS: $option"
+            else
+              echo "FAIL: Missing option $option"
+              exit 1
+            fi
+          done
+
+      # ------------------------------------------
+      # 7. Verify container entrypoint
+      # ------------------------------------------
+
+      - name: Verify container entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ENTRYPOINT=$(docker image inspect \
+            xmrig-haos-runtime-test:local \
+            --format '{{json .Config.Entrypoint}}')
+
+          echo "Entrypoint: $ENTRYPOINT"
+
+          test "$ENTRYPOINT" = '["/bin/bash","/run.sh"]'
+
+          echo "PASS: Container entrypoint verified"
+
+      # ------------------------------------------
+      # 8. Verify runtime dependencies
+      # ------------------------------------------
+
+      - name: Verify runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /bin/bash \
+            xmrig-haos-runtime-test:local \
+            -c '
+              set -e
+              command -v jq
+              command -v xmrig
+              test -x /run.sh
+              bash -n /run.sh
+              echo "PASS: Runtime dependencies"
+            '
+
+      # ------------------------------------------
+      # 9. Final summary
+      # ------------------------------------------
+
+      - name: Runtime test summary
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "XMRig HAOS isolated runtime test"
+          echo "======================================"
+          echo "XMRig version: 6.26.0"
+          echo "Network: disabled during runtime"
+          echo "Mining: not started"
+          echo "GHCR publishing: disabled"
+          echo "Real Home Assistant: not affected"
+          echo "======================================"
+          echo "All isolated runtime checks passed."
