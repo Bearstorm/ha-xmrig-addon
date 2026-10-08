@@ -1,1 +1,120 @@
 
+name: XMRig Addon - Validation Tests
+
+on:
+  push:
+    branches:
+      - develop-v2
+
+  pull_request:
+    branches:
+      - main
+      - develop-v2
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate addon source files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install validation dependencies
+        run: |
+          python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Check HAOS startup script syntax
+        run: |
+          bash -n xmrig_haos/rootfs/run.sh
+          echo "HAOS startup script syntax OK"
+
+      - name: Check legacy startup script syntax
+        run: |
+          bash -n xmrig/rootfs/run.sh
+          echo "Legacy startup script syntax OK"
+
+      - name: Validate addon YAML files
+        shell: bash
+        run: |
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+
+          for directory in ("xmrig", "xmrig_haos"):
+              path = Path(directory) / "config.yaml"
+
+              with path.open(encoding="utf-8") as stream:
+                  config = yaml.safe_load(stream)
+
+              assert isinstance(config, dict), (
+                  f"{path}: root must be a mapping"
+              )
+
+              required = (
+                  "name",
+                  "slug",
+                  "version",
+                  "arch",
+                  "options",
+                  "schema",
+              )
+
+              for key in required:
+                  assert key in config, (
+                      f"{path}: missing required key {key}"
+                  )
+
+              assert isinstance(config["options"], dict)
+              assert isinstance(config["schema"], dict)
+
+              for option in config["options"]:
+                  assert option in config["schema"], (
+                      f"{path}: option {option} has no schema"
+                  )
+
+              print(f"PASS: {path}")
+
+          PY
+
+      - name: Verify HAOS Dockerfile
+        shell: bash
+        run: |
+          test -f xmrig_haos/Dockerfile
+          test -f xmrig_haos/rootfs/run.sh
+
+          grep -q 'XMRIG_SHA256' xmrig_haos/Dockerfile
+          grep -q 'sha256sum -c' xmrig_haos/Dockerfile
+          grep -q 'ENTRYPOINT' xmrig_haos/Dockerfile
+
+          echo "HAOS Dockerfile basic checks OK"
+
+      - name: Verify safe architecture
+        shell: bash
+        run: |
+          python - <<'PY'
+          import yaml
+
+          with open(
+              "xmrig_haos/config.yaml",
+              encoding="utf-8"
+          ) as stream:
+              config = yaml.safe_load(stream)
+
+          assert config.get("full_access", False) is False
+          assert config.get("host_network", False) is False
+          assert config.get("host_pid", False) is False
+          assert config.get("apparmor", True) is not False
+
+          print("PASS: HAOS configuration safety checks")
+          PY
+
+      - name: Validation summary
+        run: |
+          echo "XMRig source validation completed."
+          echo "Runtime and mining tests are not included yet."
