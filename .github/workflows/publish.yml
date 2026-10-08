@@ -26,11 +26,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # ------------------------------------------
+      # 2. Prepare Docker Buildx
+      # ------------------------------------------
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+
+      # ------------------------------------------
+      # 3. Normalize image owner
+      # ------------------------------------------
 
       - name: Compute image owner
         id: owner
@@ -38,8 +52,15 @@ jobs:
         env:
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
+          set -euo pipefail
+
           OWNER_LC="$(echo "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+
           echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------
+      # 4. Determine publication settings
+      # ------------------------------------------
 
       - name: Determine publication settings
         id: publication
@@ -49,32 +70,49 @@ jobs:
           GIT_REF: ${{ github.ref }}
           REF_NAME: ${{ github.ref_name }}
         run: |
+          set -euo pipefail
+
           PUSH_IMAGE=false
           IMAGE_TAG=development
 
           if [ "$EVENT_NAME" = "push" ]; then
+
             if [ "$GIT_REF" = "refs/heads/main" ]; then
               PUSH_IMAGE=true
               IMAGE_TAG=latest
+
             elif [[ "$GIT_REF" == refs/tags/v* ]]; then
               PUSH_IMAGE=true
               IMAGE_TAG="$REF_NAME"
+
             fi
+
           fi
 
           echo "push_image=$PUSH_IMAGE" >> "$GITHUB_OUTPUT"
           echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
+          echo "Publish image: $PUSH_IMAGE"
+          echo "Image tag: $IMAGE_TAG"
+
+      # ------------------------------------------
+      # 5. Authenticate only when publishing
+      # ------------------------------------------
+
       - name: Log in to GHCR
         if: steps.publication.outputs.push_image == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # ------------------------------------------
+      # 6. Build legacy Supervised/MSR image
+      # ------------------------------------------
+
       - name: Build and optionally push Supervised/MSR
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./xmrig
           push: ${{ steps.publication.outputs.push_image == 'true' }}
@@ -86,11 +124,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # ------------------------------------------
+      # 2. Prepare Docker Buildx
+      # ------------------------------------------
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+
+      # ------------------------------------------
+      # 3. Normalize image owner
+      # ------------------------------------------
 
       - name: Compute image owner
         id: owner
@@ -98,8 +150,15 @@ jobs:
         env:
           REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
+          set -euo pipefail
+
           OWNER_LC="$(echo "$REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+
           echo "OWNER_LC=$OWNER_LC" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------
+      # 4. Determine publication settings
+      # ------------------------------------------
 
       - name: Determine publication settings
         id: publication
@@ -109,32 +168,49 @@ jobs:
           GIT_REF: ${{ github.ref }}
           REF_NAME: ${{ github.ref_name }}
         run: |
+          set -euo pipefail
+
           PUSH_IMAGE=false
           IMAGE_TAG=development
 
           if [ "$EVENT_NAME" = "push" ]; then
+
             if [ "$GIT_REF" = "refs/heads/main" ]; then
               PUSH_IMAGE=true
               IMAGE_TAG=latest
+
             elif [[ "$GIT_REF" == refs/tags/v* ]]; then
               PUSH_IMAGE=true
               IMAGE_TAG="$REF_NAME"
+
             fi
+
           fi
 
           echo "push_image=$PUSH_IMAGE" >> "$GITHUB_OUTPUT"
           echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
+          echo "Publish image: $PUSH_IMAGE"
+          echo "Image tag: $IMAGE_TAG"
+
+      # ------------------------------------------
+      # 5. Authenticate only when publishing
+      # ------------------------------------------
+
       - name: Log in to GHCR
         if: steps.publication.outputs.push_image == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # ------------------------------------------
+      # 6. Build HAOS Safe image
+      # ------------------------------------------
+
       - name: Build and optionally push HAOS Safe
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./xmrig_haos
           push: ${{ steps.publication.outputs.push_image == 'true' }}
