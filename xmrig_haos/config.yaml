@@ -8,7 +8,8 @@ description: >-
   Works with Protection Mode ON.
 
 # Add-on version (independent of XMRig core version)
-version: "6.21.8"
+# XMRig core version: 6.26.0
+version: "6.21.9"
 
 url: "https://github.com/Bearstorm/ha-xmrig-addon"
 
@@ -33,6 +34,7 @@ options:
   worker: "HA"
   threads: 2
   priority: 2
+  tls_mode: "auto"
 
 # Configuration validation
 schema:
@@ -42,3 +44,4 @@ schema:
   worker: "str(1,64)"
   threads: "int(1,256)"
   priority: "int(0,5)"
+  tls_mode: "list(auto|enabled|disabled)"
