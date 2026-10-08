@@ -1,3 +1,4 @@
+
 name: XMRig HAOS - Isolated Runtime Test
 
 on:
@@ -6,6 +7,7 @@ on:
       - develop-v2
     paths:
       - ".github/workflows/runtime-test.yml"
+
   workflow_dispatch:
 
 permissions:
@@ -24,21 +26,23 @@ jobs:
       # ------------------------------------------
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # ------------------------------------------
       # 2. Prepare Docker Buildx
       # ------------------------------------------
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # ------------------------------------------
       # 3. Build HAOS image locally
       # ------------------------------------------
 
       - name: Build HAOS Safe runtime image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./xmrig_haos
           load: true
@@ -90,7 +94,7 @@ jobs:
           echo "PASS: XMRig 6.26.0 version verified"
 
       # ------------------------------------------
-      # 6. Verify CLI parameters
+      # 6. Verify supported CLI options
       # ------------------------------------------
 
       - name: Verify supported command-line options
@@ -132,7 +136,7 @@ jobs:
           done
 
       # ------------------------------------------
-      # 7. Verify default startup configuration
+      # 7. Verify container entrypoint
       # ------------------------------------------
 
       - name: Verify container entrypoint
@@ -151,7 +155,7 @@ jobs:
           echo "PASS: Container entrypoint verified"
 
       # ------------------------------------------
-      # 8. Verify included dependencies
+      # 8. Verify runtime dependencies
       # ------------------------------------------
 
       - name: Verify runtime dependencies
