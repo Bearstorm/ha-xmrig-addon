@@ -150,6 +150,47 @@ class MinerManagerTests(unittest.TestCase):
         self.assertEqual(kwargs["stdin"], subprocess.DEVNULL)
         self.assertTrue(kwargs["close_fds"])
 
+    def test_http_api_bound_to_loopback(self):
+        self.manager.start()
+        args = self.spawner.args[0][0]
+        self.assertIn("--http-host=127.0.0.1", args)
+        self.assertIn("--http-port=18080", args)
+        self.assertEqual(sum(a.startswith("--http-host=") for a in args), 1)
+        self.assertEqual(sum(a.startswith("--http-port=") for a in args), 1)
+
+    def test_http_api_keeps_restricted_mode(self):
+        self.manager.start()
+        args = self.spawner.args[0][0]
+        self.assertNotIn("--http-no-restricted", args)
+        self.assertNotIn("--http-enabled=false", args)
+        self.assertNotIn("--http-host=0.0.0.0", args)
+
+    def test_http_flags_are_retained_after_retry(self):
+        self.manager.start()
+        self.spawner.processes[0].crash()
+        self.manager.reconcile()
+        self.clock.advance(5)
+        self.manager.reconcile()
+        self.assertEqual(len(self.spawner.args), 2)
+        for args, _ in self.spawner.args:
+            self.assertIn("--http-host=127.0.0.1", args)
+            self.assertIn("--http-port=18080", args)
+            self.assertNotIn("--http-no-restricted", args)
+
+    def test_http_flags_do_not_change_tls_behavior(self):
+        self.manager.start()
+        args = self.spawner.args[0][0]
+        self.assertIn("--tls", args)
+        self.assertIn("--http-host=127.0.0.1", args)
+        self.assertEqual(args[args.index("--url") + 1], "pool.supportxmr.com:443")
+
+    def test_http_api_does_not_start_separate_process(self):
+        self.manager.start()
+        self.manager.reconcile()
+        self.assertEqual(len(self.spawner.processes), 1)
+        self.manager.shutdown()
+        self.assertEqual(len(self.spawner.processes), 1)
+
     def test_stop_sends_sigterm(self):
         self.manager.start()
         proc = self.spawner.processes[0]
