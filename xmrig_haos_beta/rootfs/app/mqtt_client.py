@@ -68,7 +68,9 @@ class MqttPublisher:
         # paho v2 reason codes compare to zero on successful connection.
         if reason_code != 0:
             with self._lock:
-                self._connected = False
+                if client is self._client and not self._closed:
+                    self._connected = False
+                    self.commands.clear()
             LOG.warning("MQTT connection refused")
             return
         with self._lock:
@@ -96,18 +98,23 @@ class MqttPublisher:
                 LOG.warning("MQTT Discovery publishing failed")
 
     def _on_message(self, client: Any, userdata: Any, message: Any) -> None:
-        if self._closed or client is not self._client:
-            return
-        try:
-            self.commands.submit(message.topic, message.payload,
-                                 retained=bool(message.retain),
-                                 expected_topic=self._discovery.command_topic)
-        except (AttributeError, ValueError, TypeError):
-            LOG.warning("Invalid MQTT command ignored")
+        # Disconnect and network callbacks can race with the Controller loop.
+        # Never queue a command from an inactive or obsolete MQTT session.
+        with self._lock:
+            if self._closed or not self._connected or client is not self._client:
+                return
+            try:
+                self.commands.submit(message.topic, message.payload,
+                                     retained=bool(message.retain),
+                                     expected_topic=self._discovery.command_topic)
+            except (AttributeError, ValueError, TypeError):
+                LOG.warning("Invalid MQTT command ignored")
 
     def _on_disconnect(self, client: Any, userdata: Any, flags: Any,
                        reason_code: Any, properties: Any = None) -> None:
         with self._lock:
+            if self._closed or client is not self._client:
+                return
             self._connected = False
             self.commands.clear()
 
