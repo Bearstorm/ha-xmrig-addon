@@ -17,6 +17,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "xmrig_haos_beta" / "rootfs"))
 
 from app import mqtt_service
+from app.mqtt_commands import CommandMailbox
+from app.mqtt_discovery import DiscoveryPayloads
 from app.mqtt_runtime import load_mqtt_publisher
 
 
@@ -47,6 +49,24 @@ class ServiceHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         return
+
+
+class BetaIsolationTests(unittest.TestCase):
+    def test_beta_discovery_and_command_topics_are_unique(self):
+        beta = DiscoveryPayloads()
+        self.assertEqual(beta.command_topic, "xmrig_haos_beta/command")
+        self.assertEqual(beta.telemetry_topic, "xmrig_haos_beta/telemetry")
+        messages = beta.discovery_messages()
+        self.assertEqual(len(messages), 9)
+        self.assertTrue(all("xmrig_haos_beta" in msg.topic for msg in messages))
+        self.assertTrue(all("xmrig_haos/" not in msg.topic for msg in messages))
+
+    def test_stable_commands_cannot_reach_beta_mailbox(self):
+        inbox = CommandMailbox()
+        self.assertFalse(inbox.submit("xmrig_haos/command", b"OFF"))
+        self.assertTrue(inbox.submit("xmrig_haos_beta/command", b"OFF"))
+        self.assertEqual(inbox.take(), "OFF")
+        self.assertIsNone(inbox.take())
 
 
 class SupervisorContractTests(unittest.TestCase):
