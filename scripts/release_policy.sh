@@ -88,10 +88,9 @@ case "$EVENT_NAME" in
 
         if [[ "$GIT_REF" == "refs/heads/main" ]]; then
 
-            PUSH_IMAGE=true
-            IMAGE_TAG=latest
-
-            log "Main branch publication approved"
+            # A merge to main is not a release approval. Only a verified
+            # v2.* tag pointing at main HEAD may publish to GHCR.
+            log "Main branch: build only; explicit release tag required"
 
         # ------------------------------------------
         # Version 2 release tags
