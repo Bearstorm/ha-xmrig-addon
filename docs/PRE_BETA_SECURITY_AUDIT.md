@@ -23,6 +23,18 @@ Date: 2026-10-13. Scope: development branch `develop-v2`; HAOS Safe add-on and i
 5. **Container security and supply chain:** Pin or document base-image digest and Python dependency provenance; review outbound-only network needs, unprivileged runtime UID feasibility, Linux capabilities, and the minimum Supervisor API permission.
 6. **Release procedure:** Verify branch/tag protection and required CI checks in GitHub repository settings. Main branch changes now build only; publishing requires an explicit release tag following a separate approval.
 
+## Step 35: Mock-child restart and failure coverage
+
+The isolated Docker runtime suite now includes four additional tests:
+- Saved OFF state persists across two independently created Controllers and prevents a second mock XMRig launch.
+- Corrupted state prevents launch.
+- Failed ON-state persistence blocks the launch.
+- OFF during scheduled crash recovery prevents later automatic restart.
+
+The integration suite has 9 real-subprocess mock tests, 5 real-Mosquitto tests, and a separate validation suite of 226 scenarios, all verified in GitHub Actions for step 35. These tests do **not** prove real HAOS Supervisor interoperability.
+
+**Remaining persistence caveat:** If a disk fails while persisting OFF, the controller still stops XMRig, but a previously saved ON might survive and allow a new startup later. This case requires explicit recovery policy and testing before beta.
+
 ## Safe release sequence
 
 1. Keep previous HAOS image and configuration as rollback target; back up Home Assistant.
