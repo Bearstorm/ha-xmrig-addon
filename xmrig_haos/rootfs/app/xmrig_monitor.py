@@ -82,12 +82,21 @@ def parse_summary(payload: Any) -> MinerSnapshot:
             rejected = total - good
 
     pool_connected: bool | None = None
-    # Explicit status takes precedence. An elapsed positive connection uptime
-    # can also indicate a connection, but 0/absent is not proof of disconnection.
+    # XMRig 6.26.0 does not normally emit a `connected` field. Its
+    # connection.uptime_ms is calculated from the currently active connection
+    # and becomes zero when no connection is active. A zero is ambiguous at
+    # the instant of connection, so it is not interpreted as False.
+    # Older API responses may only expose connection.uptime (whole seconds).
     if isinstance(connection.get("connected"), bool):
         pool_connected = connection["connected"]
-    elif (uptime := _nonnegative_int(connection.get("uptime"))) is not None and uptime > 0:
-        pool_connected = True
+    elif "uptime_ms" in connection:
+        uptime_ms = _nonnegative_int(connection["uptime_ms"])
+        if uptime_ms is not None and uptime_ms > 0:
+            pool_connected = True
+    else:
+        uptime = _nonnegative_int(connection.get("uptime"))
+        if uptime is not None and uptime > 0:
+            pool_connected = True
 
     return MinerSnapshot(
         api_available=True,
