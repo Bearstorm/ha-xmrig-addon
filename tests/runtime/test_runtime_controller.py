@@ -17,6 +17,8 @@ from unittest.mock import patch
 
 from app.config import MinerConfig
 from app.main import Controller
+from app.mining_state import MiningStateStore, StateStoreError
+from app.mqtt_commands import CommandMailbox
 from app.miner_manager import MinerManager, MinerState, RestartPolicy
 from app.xmrig_monitor import MinerSnapshot
 
@@ -54,6 +56,23 @@ class OfflineMonitor:
     def poll(self):
         self.calls += 1
         return MinerSnapshot(False, error="api_unavailable")
+
+
+
+class StubPublisher:
+    def __init__(self):
+        self.commands = CommandMailbox()
+        self.records = []
+
+    def start(self):
+        return True
+
+    def publish(self, snapshot, *, process_running):
+        self.records.append((snapshot, process_running))
+        return True
+
+    def close(self):
+        pass
 
 
 class ControllerRuntimeTests(unittest.TestCase):
@@ -174,6 +193,115 @@ class ControllerRuntimeTests(unittest.TestCase):
         self.assertEqual(result, [0])
         self.assertEqual(manager.state, MinerState.STOPPED)
         self.assertTrue(self.wait_for(lambda: any(e["event"] == "terminated" for e in self.events())))
+
+
+    def _run_controller_thread(self, manager, store, publisher=None):
+        controller = Controller(
+            manager, state_store=store, publisher=publisher,
+            poll_interval=0.02, monitor_interval=0.03,
+        )
+        result = []
+        thread = threading.Thread(target=lambda: result.append(controller.run()))
+        thread.start()
+        return controller, thread, result
+
+    def test_off_persists_across_actual_controller_restart(self):
+        store = MiningStateStore(self.root / "xmrig_state.json")
+        first = self.manager()
+        pub = StubPublisher()
+        controller, thread, result = self._run_controller_thread(first, store, pub)
+        try:
+            self.assertTrue(self.wait_for(lambda: any(e["event"] == "started" for e in self.events())))
+            pub.commands.submit("xmrig_haos/command", b"OFF")
+            self.assertTrue(self.wait_for(lambda: not first.desired_running and first.pid is None))
+            self.assertFalse(store.load())
+            self.assertEqual(first.state, MinerState.STOPPED)
+        finally:
+            controller.request_shutdown()
+            thread.join(timeout=5)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(result, [0])
+        initial_count = len([e for e in self.events() if e["event"] == "started"])
+
+        second = self.manager()
+        second_pub = StubPublisher()
+        controller2, thread2, result2 = self._run_controller_thread(second, store, second_pub)
+        try:
+            self.assertTrue(self.wait_for(lambda: bool(second_pub.records)))
+            time.sleep(0.15)
+            self.assertEqual(
+                len([e for e in self.events() if e["event"] == "started"]),
+                initial_count,
+            )
+            self.assertIsNone(second.pid)
+            self.assertFalse(any(running for _, running in second_pub.records))
+        finally:
+            controller2.request_shutdown()
+            thread2.join(timeout=5)
+        self.assertFalse(thread2.is_alive())
+        self.assertEqual(result2, [0])
+
+    def test_corrupt_state_never_spawns_mock_process(self):
+        store = MiningStateStore(self.root / "xmrig_state.json")
+        store.path.write_text("corrupted")
+        manager = self.manager()
+        publisher = StubPublisher()
+        controller, thread, result = self._run_controller_thread(manager, store, publisher)
+        try:
+            self.assertTrue(self.wait_for(lambda: len(publisher.records) >= 1))
+            time.sleep(0.1)
+            self.assertEqual(self.events(), [])
+            self.assertIsNone(manager.pid)
+        finally:
+            controller.request_shutdown()
+            thread.join(timeout=5)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(result, [0])
+
+    def test_failed_on_persistence_blocks_process_start(self):
+        class FailingStateStore:
+            def load(self):
+                return False
+            def save(self, running):
+                raise StateStoreError("simulated disk failure")
+
+        manager = self.manager()
+        pub = StubPublisher()
+        controller, thread, result = self._run_controller_thread(manager, FailingStateStore(), pub)
+        try:
+            self.assertTrue(self.wait_for(lambda: bool(pub.records)))
+            pub.commands.submit("xmrig_haos/command", b"ON")
+            time.sleep(0.2)
+            self.assertEqual(self.events(), [])
+            self.assertIsNone(manager.pid)
+        finally:
+            controller.request_shutdown()
+            thread.join(timeout=5)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(result, [0])
+
+    def test_off_command_cancels_crash_retries(self):
+        with patch.dict(os.environ, {"MOCK_XMRIG_CRASH": "1"}):
+            store = MiningStateStore(self.root / "xmrig_state.json")
+            manager = self.manager(RestartPolicy(delays=(0.5, 0.5), stable_seconds=60))
+            pub = StubPublisher()
+            controller, thread, result = self._run_controller_thread(manager, store, pub)
+            try:
+                self.assertTrue(self.wait_for(
+                    lambda: manager.state == MinerState.ERROR and manager.retry_at is not None
+                ))
+                pub.commands.submit("xmrig_haos/command", b"OFF")
+                self.assertTrue(self.wait_for(
+                    lambda: not manager.desired_running and manager.retry_at is None
+                ))
+                time.sleep(0.6)
+                self.assertEqual(len([e for e in self.events() if e["event"] == "started"]), 1)
+                self.assertFalse(store.load())
+            finally:
+                controller.request_shutdown()
+                thread.join(timeout=5)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(result, [0])
 
 
 if __name__ == "__main__":
