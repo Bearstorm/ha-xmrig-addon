@@ -80,7 +80,7 @@ jobs:
           import yaml
           from pathlib import Path
 
-          for directory in ("xmrig", "xmrig_haos"):
+          for directory in ("xmrig", "xmrig_haos", "xmrig_haos_beta"):
               path = Path(directory) / "config.yaml"
 
               with path.open(encoding="utf-8") as stream:
@@ -156,7 +156,22 @@ jobs:
           assert config.get("host_pid", False) is False
           assert config.get("apparmor", True) is not False
 
-          print("PASS: HAOS configuration safety checks")
+          with open("xmrig_haos_beta/config.yaml", encoding="utf-8") as stream:
+              beta = yaml.safe_load(stream)
+          assert beta["slug"] == "xmrig_haos_beta"
+          assert beta["stage"] == "experimental"
+          assert beta["boot"] == "manual"
+          assert beta["init"] is False
+          assert beta["host_network"] is False
+          assert beta["host_pid"] is False
+          assert beta["full_access"] is False
+          assert beta["apparmor"] is True
+          assert beta["services"] == ["mqtt:want"]
+          assert beta["options"]["wallet"] == ""
+          assert "image" not in beta
+          assert "hassio_api" not in beta
+          assert "homeassistant_api" not in beta
+          print("PASS: HAOS Safe and isolated experimental beta permissions")
           PY
 
       # ------------------------------------------
