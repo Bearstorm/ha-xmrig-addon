@@ -179,13 +179,12 @@ expect_build_only \
     "$MAIN_SHA"
 
 # TEST 04 - Main branch
-expect_allowed \
-    "Main branch publishes latest" \
+expect_build_only \
+    "Main branch requires explicit release tag" \
     "push" \
     "refs/heads/main" \
     "main" \
-    "$MAIN_SHA" \
-    "latest"
+    "$MAIN_SHA"
 
 # TEST 05 - Stable release
 expect_allowed \
