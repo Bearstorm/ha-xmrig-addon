@@ -313,3 +313,61 @@ jobs:
           echo "Production HAOS: not affected"
           echo "======================================"
           echo "All Python Controller runtime checks passed."
+
+  haos-python-candidate:
+    name: Build candidate HAOS Python image without mining
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Build unchanged HAOS base locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --tag xmrig-haos-legacy:local ./xmrig_haos
+
+      - name: Build Python candidate locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull=false \
+            --file tests/runtime/Dockerfile.haos-python \
+            --tag xmrig-haos-python:local .
+
+      - name: Check Python candidate without starting mining
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENTRYPOINT="$(docker image inspect xmrig-haos-python:local --format '{{json .Config.Entrypoint}}')"
+          test "$ENTRYPOINT" = '["/usr/bin/python3","-m","app.main"]'
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /usr/bin/python3 \
+            xmrig-haos-python:local \
+            -c 'import app.config, app.main, app.miner_manager, app.xmrig_monitor; print("PASS: Controller imports from HAOS candidate")'
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /usr/bin/xmrig \
+            xmrig-haos-python:local --version
+
+          echo "PASS: HAOS Python candidate builds and imports; no mining started"
