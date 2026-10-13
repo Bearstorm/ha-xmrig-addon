@@ -70,6 +70,8 @@ class Controller:
         self._monitor = monitor
         self._publisher = publisher
         self._state_store = state_store
+        self._armed_by_this_session = False
+        self._failed_off_persistence = False
         self._monitor_interval = monitor_interval
         self._monitor_stop = threading.Event()
         self._monitor_wake = threading.Event()
@@ -154,20 +156,33 @@ class Controller:
             LOG.warning("MQTT command mailbox failed; mining continues")
             return
         if command == "OFF":
+            saved_off = True
             if self._state_store is not None:
                 try:
                     self._state_store.save(False)
                 except StateStoreError:
-                    LOG.warning("Unable to persist OFF state; stopping miner anyway")
+                    saved_off = False
+                    self._failed_off_persistence = True
+                    LOG.warning("Unable to persist OFF state; restart guard remains armed")
             if self._manager.desired_running:
                 self._manager.stop()
                 self._update_process(MinerState.STOPPED)
+            if saved_off and self._state_store is not None:
+                try:
+                    self._state_store.disarm()
+                    self._armed_by_this_session = False
+                    self._failed_off_persistence = False
+                except StateStoreError:
+                    LOG.warning("Unable to clear startup guard; next startup will remain OFF")
         elif command == "ON" and not self._manager.desired_running:
             if self._state_store is not None:
                 try:
+                    # Arm guard first, before storing ON or spawning a process.
+                    self._state_store.arm()
+                    self._armed_by_this_session = True
                     self._state_store.save(True)
                 except StateStoreError:
-                    LOG.warning("Unable to persist ON state; miner remains stopped")
+                    LOG.warning("Unable to safely arm mining; miner remains stopped")
                     return
             self._manager.start()
             self._update_process(self._manager.state)
@@ -191,8 +206,15 @@ class Controller:
                 if self._state_store is not None:
                     try:
                         should_start = self._state_store.load()
+                        if self._state_store.guard_exists():
+                            LOG.warning("Unclean previous shutdown; mining remains OFF")
+                            should_start = False
+                        if should_start:
+                            # A crash while running leaves the guard in place.
+                            self._state_store.arm()
+                            self._armed_by_this_session = True
                     except StateStoreError:
-                        LOG.warning("Invalid persisted mining state; starting safely OFF")
+                        LOG.warning("Unsafe mining state or storage; starting safely OFF")
                         should_start = False
                 if should_start:
                     self._manager.start()
@@ -236,6 +258,21 @@ class Controller:
                     exit_code = 1
             with self._snapshot_lock:
                 self._snapshot = MinerSnapshot(False, error="miner_not_running")
+            if (
+                self._state_store is not None
+                and self._armed_by_this_session
+                and not self._failed_off_persistence
+                and self._stop_event.is_set()
+                and exit_code == 0
+            ):
+                # Graceful shutdown preserves the previous ON preference.
+                # A crash or failed OFF persistence must retain the guard.
+                try:
+                    if self._state_store.load():
+                        self._state_store.disarm()
+                        self._armed_by_this_session = False
+                except StateStoreError:
+                    LOG.warning("Startup guard retained; next startup will remain OFF")
             if self._publisher is not None:
                 try:
                     self._publisher.close()
