@@ -370,5 +370,51 @@ class ControllerRuntimeTests(unittest.TestCase):
             self.assertEqual(result, [0])
 
 
+    def test_controller_exhaustion_returns_error_and_reaps_child(self):
+        with patch.dict(os.environ, {"MOCK_XMRIG_CRASH": "1"}):
+            store = MiningStateStore(self.root / "state.json")
+            manager = self.manager(RestartPolicy(delays=(0.03, 0.03), stable_seconds=60))
+            controller = Controller(manager, state_store=store, poll_interval=0.02)
+            self.assertEqual(controller.run(), 1)
+            self.assertFalse(manager.desired_running)
+            self.assertIsNone(manager.pid)
+            self.assertTrue(store.guard_exists())
+            self.assertEqual(
+                len([e for e in self.events() if e["event"] == "started"]), 3
+            )
+
+    def test_queued_on_is_ignored_when_shutdown_requested(self):
+        store = MiningStateStore(self.root / "state.json")
+        store.save(False)
+        manager = self.manager()
+        publisher = StubPublisher()
+        self.assertTrue(publisher.commands.submit("xmrig_haos/command", b"ON"))
+        controller = Controller(manager, publisher=publisher,
+                                state_store=store, poll_interval=0.02)
+        controller.request_shutdown()
+        self.assertEqual(controller.run(), 0)
+        self.assertEqual(self.events(), [])
+        self.assertIsNone(manager.pid)
+        self.assertFalse(store.load())
+
+    def test_off_after_exhaustion_stops_and_saves_state(self):
+        store = MiningStateStore(self.root / "state.json")
+        store.save(True)
+        with patch.dict(os.environ, {"MOCK_XMRIG_CRASH": "1"}):
+            manager = self.manager(RestartPolicy(delays=(0.03, 0.03), stable_seconds=60))
+            controller = Controller(manager, state_store=store, poll_interval=0.02)
+            self.assertEqual(controller.run(), 1)
+        self.assertTrue(store.guard_exists())
+        publisher = StubPublisher()
+        controller2 = Controller(manager, state_store=store, publisher=publisher,
+                                 poll_interval=0.02)
+        self.assertTrue(publisher.commands.submit("xmrig_haos/command", b"OFF"))
+        controller2._apply_mqtt_command()
+        self.assertFalse(store.load())
+        self.assertFalse(store.guard_exists())
+        self.assertFalse(manager.desired_running)
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
