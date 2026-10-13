@@ -23,11 +23,11 @@ class MiningStateStore:
         self.path = Path(path)
 
     def load(self) -> bool:
-        """Absent file preserves legacy startup ON; invalid file fails OFF."""
+        """Beta first startup is OFF; invalid file also fails closed OFF."""
         try:
             raw = self.path.read_bytes()
         except FileNotFoundError:
-            return True
+            return False
         except OSError as exc:
             raise StateStoreError("Unable to read mining state") from None
         if len(raw) > 256:
