@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import tempfile
 from pathlib import Path
 
@@ -41,6 +42,65 @@ class MiningStateStore:
             raise StateStoreError("Invalid mining state value")
         return data["running"]
 
+
+    @property
+    def guard_path(self) -> Path:
+        return self.path.with_name(self.path.name + ".armed")
+
+    def guard_exists(self) -> bool:
+        """A left-behind arm marker means unexpected shutdown: fail closed."""
+        try:
+            info = self.guard_path.lstat()
+            if not stat.S_ISREG(info.st_mode):
+                raise StateStoreError("Invalid mining startup guard")
+            if self.guard_path.read_bytes() != b"armed\n":
+                raise StateStoreError("Invalid mining startup guard")
+            return True
+        except FileNotFoundError:
+            return False
+        except OSError:
+            raise StateStoreError("Unable to check mining startup guard") from None
+
+    def arm(self) -> None:
+        """Persist a crash guard before allowing the miner to start."""
+        temp = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb", prefix=".xmrig-armed-",
+                dir=self.path.parent, delete=False
+            ) as stream:
+                temp = stream.name
+                os.fchmod(stream.fileno(), 0o600)
+                stream.write(b"armed\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp, self.guard_path)
+            temp = None
+            self._sync_directory()
+        except OSError:
+            raise StateStoreError("Unable to arm mining startup guard") from None
+        finally:
+            if temp is not None:
+                try:
+                    os.unlink(temp)
+                except OSError:
+                    pass
+
+    def disarm(self) -> None:
+        """Remove guard only after a verified graceful shutdown or saved OFF."""
+        try:
+            self.guard_path.unlink(missing_ok=True)
+            self._sync_directory()
+        except OSError:
+            raise StateStoreError("Unable to clear mining startup guard") from None
+
+    def _sync_directory(self) -> None:
+        directory_fd = os.open(self.path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+
     def save(self, running: bool) -> None:
         if not isinstance(running, bool):
             raise StateStoreError("Invalid mining state value")
@@ -59,11 +119,7 @@ class MiningStateStore:
                 os.fsync(stream.fileno())
             os.replace(temp, self.path)
             temp = None
-            directory_fd = os.open(self.path.parent, os.O_RDONLY)
-            try:
-                os.fsync(directory_fd)
-            finally:
-                os.close(directory_fd)
+            self._sync_directory()
         except OSError:
             raise StateStoreError("Unable to persist mining state") from None
         finally:
