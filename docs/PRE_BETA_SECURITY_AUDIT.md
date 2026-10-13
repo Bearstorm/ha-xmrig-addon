@@ -37,6 +37,14 @@ The integration suite has 9 real-subprocess mock tests, 5 real-Mosquitto tests, 
 
 **Storage limitation:** No userspace code can guarantee persistence if the underlying storage loses acknowledged writes, is irreparably damaged, or the whole volume disappears. The fail-closed guard handles ordinary write exceptions and unclean shutdowns when earlier durable guard creation succeeded; HAOS hardware testing remains required.
 
+## Step 37: Minimum Supervisor permissions and candidate smoke test
+
+Checked against official Home Assistant developer documentation: services with `mqtt:want` can be accessed at `GET /services/mqtt` using the injected `SUPERVISOR_TOKEN`. The service API is accessible in the default app role without enabling the broad `hassio_api: true` permission. Do not raise the Supervisor role or disable Protection Mode merely for MQTT discovery.
+
+An additional guarded smoke script `tests/runtime/test_haos_candidate_smoke.py` executes *inside the actual candidate image* in CI with `--network none`, read-only filesystem and constrained CPU/memory. It asserts that `MiningStateStore(OFF)` and a leftover crash guard prevent process startup, with an injected failure on every attempted XMRig spawn. It does not test a real HAOS Supervisor or live MQTT credentials.
+
+The full acceptance criteria and manual rollback plan are in `docs/HAOS_BETA_ACCEPTANCE.md`. Beta remains blocked until a disposable HAOS installation validates MQTT service access and startup behavior.
+
 ## Safe release sequence
 
 1. Keep previous HAOS image and configuration as rollback target; back up Home Assistant.
