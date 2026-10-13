@@ -128,3 +128,14 @@ Scope limitation: this verifies Linux process and signal behavior in a self-cont
 **Step 47:** `tests/runtime/test_beta_state_recovery.py` exercises absent state, malformed JSON, incorrect types/schema version, corrupted guard contents, non-file guard and leftover valid guard; every attempt to start a miner raises a test failure. A valid persisted OFF must still allow a safe idle start. These tests run in the standalone beta Docker image without a mining pool, network, actual XMRig or Home Assistant credentials.
 
 CI result evidence: see the matching isolated runtime workflow before marking these items passed. Both scenarios remain development-only, not substitutes for a disposable HAOS test with Protection Mode ON.
+
+
+## Steps 48–52: consecutive pre-beta hardening gates (2026-10-13)
+
+48. **Unavailable or damaged /data:** `tests/runtime/test_beta_storage_failures.py` runs with a real beta Controller and a fail-on-start XMRig stub. Missing state directory, state path substituted by a directory, rejected guard arm writes, unreadable state and unreadable guard must remain OFF. These are fault-injection tests, not physical disk failure validation.
+49. **Least privileges:** `scripts/check_beta_security.py` validates the beta add-on manifest, manual boot, unique slug, optional MQTT service and absence of privileged host access. It does not prove Supervisor honors Protection Mode until an actual staging installation.
+50. **Confidential log paths:** `tests/runtime/test_beta_secret_logging.py` exercises representative invalid MQTT service responses, broker startup errors and bad pool configuration, checking that fake wallet/password/token values never appear in captured logs. It does not guarantee all future library logs are secret-free.
+51. **Supply chain:** `scripts/check_beta_supply_chain.py` checks XMRig 6.26.0, archive SHA256 verification and pinned `paho-mqtt==2.1.0`. Debian Bookworm base image tag, OS packages and PyPI wheel hashes are **not** yet pinned to immutable digests and remain open work.
+52. **Release evidence:** `docs/BETA_RELEASE_EVIDENCE.json` and `scripts/check_beta_release_gate.py` keep beta release readiness explicitly **blocked** until separate HAOS Supervisor, Protection Mode, broker, process cleanup, rollback, resource/temperature and supply-chain evidence has been collected and a human release decision has been made.
+
+The tests do not perform real mining and do not touch production Home Assistant, `main`, published GHCR images or release tags. Existing English README author style is unchanged. The development branch is not authorized for release by a passing CI check.
