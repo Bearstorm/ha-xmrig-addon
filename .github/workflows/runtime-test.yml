@@ -345,7 +345,7 @@ jobs:
         run: |
           set -euo pipefail
           ENTRYPOINT="$(docker image inspect xmrig-haos-python:local --format '{{json .Config.Entrypoint}}')"
-          test "$ENTRYPOINT" = '["/usr/bin/python3","-m","app.main"]'
+          test "$ENTRYPOINT" = '["/opt/xmrig-venv/bin/python","-m","app.main"]'
 
           docker run --rm \
             --network none \
@@ -357,7 +357,7 @@ jobs:
             --cap-drop ALL \
             --entrypoint /usr/bin/python3 \
             xmrig-haos-python:local \
-            -c 'import app.config, app.main, app.miner_manager, app.xmrig_monitor; print("PASS: Controller imports from HAOS candidate")'
+            -c 'import app.config, app.main, app.miner_manager, app.xmrig_monitor, app.mqtt_client, app.mqtt_service, app.mqtt_discovery; print("PASS: Controller and MQTT modules import from HAOS candidate")'
 
           docker run --rm \
             --network none \
@@ -369,5 +369,17 @@ jobs:
             --cap-drop ALL \
             --entrypoint /usr/bin/xmrig \
             xmrig-haos-python:local --version
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-python:local \
+            -c 'import paho.mqtt.client as mqtt; assert mqtt.CallbackAPIVersion.VERSION2; print("PASS: MQTT dependency available in candidate")'
 
           echo "PASS: HAOS Python candidate builds and imports; no mining started"
