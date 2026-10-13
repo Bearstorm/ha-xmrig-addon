@@ -52,3 +52,16 @@ The published HAOS add-on still runs `/bin/bash /run.sh`. The Python + MQTT func
 GitHub Actions now tests the beta module against a **local mock Supervisor HTTP service**, exercising the expected `GET /services/mqtt` contract, `Bearer` authorization, missing/rejected tokens, broker credentials and optional MQTT fallback. It also checks that beta command topics and retained Discovery entity topics do not overlap with the stable HAOS namespace. The simulated service uses a fake token and never connects to a real HAOS or mining pool.
 
 **Evidence boundary:** A mock Supervisor validates client behavior, not Supervisor compatibility or HAOS runtime permissions. A separate staging HAOS install with Protection Mode ON and a real Supervisor-provided MQTT service remains mandatory before release. Production HAOS access is out of scope.
+
+
+## Step 42 — full beta entrypoint/options.json preflight
+
+The CI beta package job now runs `tests/runtime/test_beta_entrypoint_options.py` inside the **independently built beta Docker image**, with `--network none`, CPU/memory/PID limits, no host privileges, a read-only root filesystem and an ephemeral writable `/data` tmpfs.
+
+The script exercises the real `app.main.main()` wiring, the actual `app.config.load_config()` default `/data/options.json` path, and the production `MiningStateStore` default `/data/xmrig_state.json` path. It substitutes a fail-on-spawn method so any attempt to start XMRig would fail CI. Checks include:
+- a valid staging `options.json` with absent state must boot and remain Mining OFF;
+- a persisted ON together with a crash guard must refuse to auto-start;
+- malformed `options.json` must return a controlled startup error;
+- an empty wallet must return a controlled configuration error.
+
+The test uses no real credentials, real mining, real Supervisor token or HAOS installation. **It does not establish actual HAOS Supervisor, Protection Mode, MQTT ACL or resource/thermal compatibility.** On-device staging acceptance and rollback evidence remain mandatory before a beta release.
