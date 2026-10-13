@@ -56,6 +56,7 @@ jobs:
           python scripts/check_readme.py
           python scripts/check_beta_security.py
           python scripts/check_beta_supply_chain.py
+          python scripts/check_beta_release_gate.py
 
       # 3. Validate startup scripts
       # ------------------------------------------
