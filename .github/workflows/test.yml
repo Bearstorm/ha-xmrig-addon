@@ -74,6 +74,8 @@ jobs:
       - name: Validate addon YAML files
         shell: bash
         run: |
+          set -euo pipefail
+
           python - <<'PY'
           import yaml
           from pathlib import Path
@@ -111,7 +113,6 @@ jobs:
                   )
 
               print(f"PASS: {path}")
-
           PY
 
       # ------------------------------------------
@@ -139,6 +140,8 @@ jobs:
       - name: Verify safe architecture
         shell: bash
         run: |
+          set -euo pipefail
+
           python - <<'PY'
           import yaml
 
@@ -153,8 +156,8 @@ jobs:
           assert config.get("host_pid", False) is False
           assert config.get("apparmor", True) is not False
 
-          print("PASS: HAOS configuration safety checks"
-          PY)
+          print("PASS: HAOS configuration safety checks")
+          PY
 
       # ------------------------------------------
       # 7. Validate functional test scripts
