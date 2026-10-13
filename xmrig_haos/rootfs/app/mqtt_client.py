@@ -38,6 +38,7 @@ class MqttPublisher:
         self._started = False
         self._connected = False
         self._closed = False
+        self._last_process_running: bool | None = None
 
     @property
     def connected(self) -> bool:
@@ -73,12 +74,21 @@ class MqttPublisher:
         with self._lock:
             if self._closed or client is not self._client:
                 return
+            self.commands.clear()
             self._connected = True
             try:
                 for msg in self._discovery.discovery_messages():
                     if not self._publish(client, msg):
                         LOG.warning("MQTT Discovery publish was not accepted")
                         break
+                if self._last_process_running is not None:
+                    self._publish(client, MqttMessage(
+                        self._discovery.process_availability_topic,
+                        "online" if self._last_process_running else "offline", retain=True,
+                    ))
+                self._publish(client, MqttMessage(
+                    self._discovery.mqtt_availability_topic, "online", retain=True, qos=1,
+                ))
                 result = client.subscribe(self._discovery.command_topic, qos=1)
                 if result[0] != 0:
                     LOG.warning("MQTT control subscription was not accepted")
@@ -99,6 +109,7 @@ class MqttPublisher:
                        reason_code: Any, properties: Any = None) -> None:
         with self._lock:
             self._connected = False
+            self.commands.clear()
 
     def start(self) -> bool:
         """Start MQTT network thread once; never raise broker errors to miner."""
@@ -115,7 +126,7 @@ class MqttPublisher:
                     client.username_pw_set(self._settings.username, self._settings.password)
                 if self._settings.tls:
                     client.tls_set()
-                client.will_set(self._discovery.process_availability_topic, "offline", qos=1, retain=True)
+                client.will_set(self._discovery.mqtt_availability_topic, "offline", qos=1, retain=True)
                 client.reconnect_delay_set(min_delay=2, max_delay=60)
                 self._client = client
                 self._started = True
@@ -137,6 +148,7 @@ class MqttPublisher:
     def publish(self, snapshot: MinerSnapshot, *, process_running: bool) -> bool:
         """Best effort. Never holds or logs mining credentials."""
         with self._lock:
+            self._last_process_running = process_running
             if not self._connected or self._closed or self._client is None:
                 return False
             try:
@@ -153,6 +165,7 @@ class MqttPublisher:
             if self._closed:
                 return
             self._closed = True
+            self.commands.clear()
             client = self._client
             connected = self._connected
             self._connected = False
@@ -162,7 +175,7 @@ class MqttPublisher:
         try:
             if connected:
                 self._publish(client, MqttMessage(
-                    self._discovery.process_availability_topic, "offline", retain=True, qos=1
+                    self._discovery.mqtt_availability_topic, "offline", retain=True, qos=1
                 ))
                 client.disconnect()
         except (OSError, RuntimeError, ValueError):
