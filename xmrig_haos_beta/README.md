@@ -9,9 +9,8 @@ The existing `xmrig_haos` Dockerfile, add-on slug and `/run.sh` entrypoint remai
   durable mining state and unclean-shutdown guard.
 - Minimal service declaration `mqtt:want` (without broad Supervisor API access).
 - The default wallet is empty. Configure only on disposable, separately approved staging HAOS.
-- Both variants currently use identical MQTT Discovery device IDs/topics. Do **not**
-  run stable and beta MQTT publishers simultaneously against the same broker
-  until topic namespacing has been isolated.
+- Beta MQTT command and Discovery topics use the separate `xmrig_haos_beta` namespace;
+  client ID is also unique. Still test exclusively on a disposable HAOS instance.
 - This add-on has not yet been verified on a live HAOS Supervisor.
 - No upgrade path or release authorization is implied by adding the folder.
 
@@ -20,5 +19,5 @@ Back up the staging environment and verify rollback to the stable image.
 For actual XMRig running, acquire explicit authorization and define limits.
 
 Source modules in `rootfs/app` are intentionally copied from the
-`xmrig_haos/rootfs/app` candidate. CI verifies byte-identical modules; update
-both copies together to avoid shipping mismatched behavior.
+`xmrig_haos/rootfs/app` candidate. CI verifies byte-identical shared modules while intentionally allowing isolated
+MQTT identities in the beta copy. Update shared code in both locations.
