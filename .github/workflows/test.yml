@@ -154,7 +154,7 @@ jobs:
           assert config.get("apparmor", True) is not False
 
           print("PASS: HAOS configuration safety checks"
-          PY
+          PY)
 
       # ------------------------------------------
       # 7. Validate functional test scripts
