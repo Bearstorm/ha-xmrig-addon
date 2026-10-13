@@ -24,6 +24,11 @@ class CommandMailbox:
             self._pending = payload.decode("ascii")
         return True
 
+    def clear(self) -> None:
+        """Discard commands from a disconnected MQTT session."""
+        with self._lock:
+            self._pending = None
+
     def take(self) -> str | None:
         with self._lock:
             value = self._pending
