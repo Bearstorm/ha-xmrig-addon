@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import threading
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -427,6 +428,85 @@ class MqttControllerTests(unittest.TestCase):
         self.assertEqual(controller.run(), 0)
         self.assertFalse(any(running for _, running in publisher.records))
 
+
+
+class PersistedMiningStateControllerTests(unittest.TestCase):
+    def store(self, root):
+        from importlib import import_module
+        return import_module(f"{PACKAGE}.mining_state").MiningStateStore(
+            Path(root) / "xmrig_state.json"
+        )
+
+    def test_off_survives_controller_restart(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = self.store(root)
+            store.save(False)
+            for _ in range(2):
+                manager = FakeManager(states=[MinerState.STOPPED])
+                manager.desired_running = False
+                manager.pid = None
+                stop = threading.Event()
+                manager.on_reconcile = stop.set
+                publisher = FakePublisher()
+                self.assertEqual(Controller(manager, state_store=store, publisher=publisher,
+                                            stop_event=stop).run(), 0)
+                self.assertEqual(manager.start_calls, 0)
+                self.assertTrue(any(not running for _, running in publisher.records))
+
+    def test_corrupt_file_fails_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = self.store(root)
+            store.path.write_text("not valid JSON")
+            manager = FakeManager(states=[MinerState.STOPPED])
+            manager.desired_running = False
+            manager.pid = None
+            stop = threading.Event()
+            manager.on_reconcile = stop.set
+            self.assertEqual(Controller(manager, state_store=store, stop_event=stop).run(), 0)
+            self.assertEqual(manager.start_calls, 0)
+
+    def test_missing_file_preserves_legacy_autostart(self):
+        with tempfile.TemporaryDirectory() as root:
+            store = self.store(root)
+            manager = FakeManager()
+            stop = threading.Event()
+            manager.on_reconcile = stop.set
+            self.assertEqual(Controller(manager, state_store=store, stop_event=stop).run(), 0)
+            self.assertEqual(manager.start_calls, 1)
+
+    def test_off_saved_even_when_miner_already_stopped(self):
+        from importlib import import_module
+        CommandMailbox = import_module(f"{PACKAGE}.mqtt_commands").CommandMailbox
+        with tempfile.TemporaryDirectory() as root:
+            store = self.store(root)
+            manager = FakeManager(states=[MinerState.STOPPED])
+            manager.desired_running = False
+            manager.pid = None
+            publisher = FakePublisher()
+            publisher.commands = CommandMailbox()
+            store.save(True)
+            controller = Controller(manager, publisher=publisher, state_store=store)
+            publisher.commands.submit("xmrig_haos/command", b"OFF")
+            controller._apply_mqtt_command()
+            self.assertFalse(store.load())
+            self.assertEqual(manager.stop_calls, 0)
+
+    def test_on_saved_before_start(self):
+        from importlib import import_module
+        CommandMailbox = import_module(f"{PACKAGE}.mqtt_commands").CommandMailbox
+        with tempfile.TemporaryDirectory() as root:
+            store = self.store(root)
+            store.save(False)
+            manager = FakeManager(states=[MinerState.STOPPED])
+            manager.desired_running = False
+            manager.pid = None
+            publisher = FakePublisher()
+            publisher.commands = CommandMailbox()
+            controller = Controller(manager, publisher=publisher, state_store=store)
+            publisher.commands.submit("xmrig_haos/command", b"ON")
+            controller._apply_mqtt_command()
+            self.assertTrue(store.load())
+            self.assertEqual(manager.start_calls, 1)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
