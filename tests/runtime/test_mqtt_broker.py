@@ -82,6 +82,20 @@ class LocalBrokerTests(unittest.TestCase):
         self.assertEqual(len(found), count, f"only {len(found)} of {count} matching MQTT messages")
         return found
 
+    def test_non_retained_mining_command_reaches_mailbox(self):
+        # Never connect the commands directly to a mining process in CI.
+        self.observer.publish("xmrig_haos/command", "OFF", qos=1, retain=False)
+        received = None
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and received is None:
+            received = self.publisher.commands.take()
+            if received is None:
+                time.sleep(0.05)
+        self.assertEqual(received, "OFF")
+        self.observer.publish("xmrig_haos/command", "START", qos=1, retain=False)
+        time.sleep(0.2)
+        self.assertIsNone(self.publisher.commands.take())
+
     def test_discovery_retained_in_real_broker(self):
         # New subscribers must receive retained Home Assistant Discovery config.
         observer2 = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,
