@@ -29,6 +29,14 @@ class DiscoveryTests(unittest.TestCase):
     def test_has_nine_entities(self):
         self.assertEqual(len(self.builder.discovery_messages()), 9)
 
+    def test_switch_uses_mqtt_availability_separately(self):
+        config = next(json.loads(msg.payload) for msg in self.builder.discovery_messages()
+                      if "/switch/" in msg.topic)
+        self.assertEqual(config["availability_topic"], "xmrig_haos/mqtt_availability")
+        self.assertEqual(config["state_topic"], "xmrig_haos/process_availability")
+        self.assertFalse(config["retain"])
+        self.assertFalse(config["optimistic"])
+
     def test_unique_topics(self):
         topics = [m.topic for m in self.builder.discovery_messages()]
         self.assertEqual(len(topics), len(set(topics)))
