@@ -507,6 +507,16 @@ jobs:
             -v
           echo "PASS: Supervisor service contract with simulated bearer-token API"
 
+      - name: Test beta MQTT reconnect and command race safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests/runtime \
+            -p 'test_beta_mqtt_lifecycle.py' \
+            -v
+          echo "PASS: beta MQTT session races and retained commands"
+
       - name: Build beta add-on directly from its HAOS directory
         shell: bash
         run: |
