@@ -26,6 +26,10 @@ host_pid: false
 full_access: false
 apparmor: true
 
+# Optional Supervisor-provided MQTT broker; mining works without it.
+services:
+  - mqtt:want
+
 # Default configuration
 options:
   pool: "pool.supportxmr.com"
