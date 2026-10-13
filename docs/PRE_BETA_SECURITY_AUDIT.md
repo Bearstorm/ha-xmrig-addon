@@ -16,7 +16,7 @@ Date: 2026-10-13. Scope: development branch `develop-v2`; HAOS Safe add-on and i
 
 ## Blocking items before beta
 
-1. **Desired mining state persistence:** MQTT `OFF` currently stops XMRig only until the add-on restarts; the current Controller calls `manager.start()` at startup. Decide and test persistent `OFF` or explicitly document a restart-always-mines policy. Do not claim the switch remembers `OFF`.
+1. **Desired mining state persistence — implemented in test candidate:** `mining_state.py` stores `ON/OFF` atomically in `/data/xmrig_state.json`; initial missing state keeps the legacy auto-start behavior, saved `OFF` blocks startup, and malformed state starts safely OFF. Unit-tested; still requires a real HAOS restart/rollback test. If persistence fails while stopping, the miner stops but an earlier ON state could remain on disk; monitor and report this before release.
 2. **Controller lifecycle:** Test stop/start after retries are exhausted; verify a user stop never triggers automatic crash recovery; test SIGTERM and child reap with commands in flight.
 3. **Real HAOS:** Test on a disposable/non-production HAOS instance with Protection Mode ON and the real Supervisor MQTT service; confirm startup, stop, restart, no excessive CPU/memory/thermal impact and graceful rollback to the existing `run.sh`.
 4. **MQTT access control:** MQTT topic commands trust broker authentication and ACLs. Document that only authorized Home Assistant users/clients may publish to `xmrig_haos/command`; the MQTT payload alone is **not** an authorization layer.
@@ -33,3 +33,8 @@ Date: 2026-10-13. Scope: development branch `develop-v2`; HAOS Safe add-on and i
 6. For any failure, stop the candidate and restore the existing `run.sh` version; check Supervisor health and MQTT retained Discovery entities.
 
 This document does not authorize a merge, release, GHCR push, or installation into the user's live Home Assistant.
+
+
+## README release update agreement
+
+Keep the existing `README.md` style, language (English), title, badges, two-variant comparison, installation/configuration tables, troubleshooting, roadmap, license and donation section. Immediately before a separately approved release, update the **entire existing README** to match the features actually shipped in the production images. Explain MQTT Discovery, switch behavior, state persistence, Supervisor broker service, limitations, HAOS vs Supervised differences, and safe migration/rollback. Do not present candidate-only Python features as already installed in the published add-on. No new release or README publishing without the final release review.
