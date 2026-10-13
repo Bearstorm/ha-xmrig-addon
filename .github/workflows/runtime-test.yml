@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/workflows/runtime-test.yml"
       - "xmrig_haos/**"
+      - "xmrig_haos_beta/**"
       - "tests/runtime/**"
 
   pull_request:
@@ -17,6 +18,7 @@ on:
     paths:
       - ".github/workflows/runtime-test.yml"
       - "xmrig_haos/**"
+      - "xmrig_haos_beta/**"
       - "tests/runtime/**"
 
   workflow_dispatch:
@@ -494,6 +496,16 @@ jobs:
           grep -Fq 'node_id: str = "xmrig_haos_beta"' xmrig_haos_beta/rootfs/app/mqtt_discovery.py
           grep -Fq 'base_topic: str = "xmrig_haos_beta"' xmrig_haos_beta/rootfs/app/mqtt_discovery.py
           echo "PASS: isolated beta package and shared source consistency"
+
+      - name: Test beta Supervisor MQTT service contract without HAOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests/runtime \
+            -p 'test_beta_supervisor_contract.py' \
+            -v
+          echo "PASS: Supervisor service contract with simulated bearer-token API"
 
       - name: Build beta add-on directly from its HAOS directory
         shell: bash
