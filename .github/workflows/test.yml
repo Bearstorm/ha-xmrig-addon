@@ -153,7 +153,7 @@ jobs:
           assert config.get("host_pid", False) is False
           assert config.get("apparmor", True) is not False
 
-          print("PASS: HAOS configuration safety checks")
+          print("PASS: HAOS configuration safety checks"
           PY
 
       # ------------------------------------------
@@ -208,16 +208,13 @@ jobs:
           bash tests/test_release_policy.sh
 
       # ------------------------------------------
-      # 11. Validate Python configuration files
+      # 11. Validate Python source files
       # ------------------------------------------
 
-      - name: Check Python configuration syntax
+      - name: Check Python source syntax
         shell: bash
         run: |
           set -euo pipefail
-
-          test -f xmrig_haos/rootfs/app/config.py
-          test -f tests/test_config.py
 
           python - <<'PY'
           import ast
@@ -225,12 +222,19 @@ jobs:
 
           files = (
               Path("xmrig_haos/rootfs/app/config.py"),
+              Path("xmrig_haos/rootfs/app/miner_manager.py"),
               Path("tests/test_config.py"),
+              Path("tests/test_miner_manager.py"),
           )
 
           for path in files:
+              assert path.is_file(), (
+                  f"Missing Python source: {path}"
+              )
+
               source = path.read_text(encoding="utf-8")
               ast.parse(source, filename=str(path))
+
               print(f"PASS: Python syntax: {path}")
           PY
 
@@ -251,7 +255,23 @@ jobs:
           echo "PASS: Python configuration unit tests"
 
       # ------------------------------------------
-      # 13. Validation summary
+      # 13. Run Python Miner Manager unit tests
+      # ------------------------------------------
+
+      - name: Run Python Miner Manager unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python -m unittest discover \
+            -s tests \
+            -p 'test_miner_manager.py' \
+            -v
+
+          echo "PASS: Python Miner Manager unit tests"
+
+      # ------------------------------------------
+      # 14. Validation summary
       # ------------------------------------------
 
       - name: Validation summary
@@ -265,7 +285,8 @@ jobs:
           echo "HAOS startup functional scenarios: 20"
           echo "Release policy security scenarios: 16"
           echo "Python configuration unit tests: 23"
-          echo "Expected total scenarios: 59"
+          echo "Python Miner Manager unit tests: 23"
+          echo "Expected total scenarios: 82"
           echo "======================================"
           echo "All preceding validation steps passed."
           echo "Real mining is not performed."
