@@ -228,10 +228,12 @@ jobs:
               Path("xmrig_haos/rootfs/app/miner_manager.py"),
               Path("xmrig_haos/rootfs/app/main.py"),
               Path("xmrig_haos/rootfs/app/xmrig_monitor.py"),
+              Path("xmrig_haos/rootfs/app/mqtt_discovery.py"),
               Path("tests/test_config.py"),
               Path("tests/test_miner_manager.py"),
               Path("tests/test_main.py"),
               Path("tests/test_xmrig_monitor.py"),
+              Path("tests/test_mqtt_discovery.py"),
           )
 
           for path in files:
@@ -310,7 +312,21 @@ jobs:
           echo "PASS: Python HTTP monitoring unit tests"
 
       # ------------------------------------------
-      # 16. Validation summary
+      # 16. Test MQTT Discovery payloads without a broker
+      # ------------------------------------------
+
+      - name: Run MQTT Discovery unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests \
+            -p 'test_mqtt_discovery.py' \
+            -v
+          echo "PASS: MQTT Discovery payload tests"
+
+      # ------------------------------------------
+      # 17. Validation summary
       # ------------------------------------------
 
       - name: Validation summary
@@ -327,7 +343,8 @@ jobs:
           echo "Python Miner Manager unit tests: 28"
           echo "Python Main Controller unit tests: 20"
           echo "Python HTTP monitoring unit tests: 32"
-          echo "Expected total scenarios: 139"
+          echo "MQTT Discovery unit tests: 12"
+          echo "Expected total scenarios: 151"
           echo "======================================"
           echo "All preceding validation steps passed."
           echo "Real mining is not performed."
