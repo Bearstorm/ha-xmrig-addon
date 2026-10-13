@@ -89,3 +89,14 @@ The original English README styling, title, badges, tables, navigation, author s
 The `scripts/check_readme.py` validation guard checks the described stable/beta entrypoints, addon slugs, supported option names, basic source/manifest truths and author branding. The guard runs inside `.github/workflows/test.yml`. This is static consistency validation, not real HAOS user acceptance; run the full pre-release review again after any production-image changes.
 
 Readme development edits are not a release approval. Public publication, merge to main or GHCR changes require the separately agreed release process.
+
+
+## Step 41: fail-closed experimental first boot and HAOS staging runbook
+
+The independent `xmrig_haos_beta/rootfs/app/mining_state.py` now defaults to `OFF` when its own state file is absent. This differs intentionally from the existing stable-compatible Python Controller, which still defaults to ON on a missing file. The beta requires an **explicit MQTT ON request** before it may mine. An isolated in-container smoke test `tests/runtime/test_beta_first_boot.py` fails on any attempted XMRig start during first boot. Other persisted-state and crash-guard tests remain in the candidate image suite.
+
+`docs/HAOS_BETA_ACCEPTANCE.md` now records how to copy only the beta folder to a disposable HAOS local add-on directory, keep Protection Mode ON, check the unique `xmrig_haos_beta` MQTT namespace, capture redacted evidence and roll back by removing only the separate beta add-on. The default blank wallet intentionally fails configuration validation; even after supplying a staging-only identifier, first boot must remain OFF.
+
+**Unverified:** successful installation and MQTT service access on real HAOS; temperature/resource policy and graceful on-device rollback. These remain beta release blockers.
+
+README remains faithful to the stable published image; beta behavior is documented only as experimental.
