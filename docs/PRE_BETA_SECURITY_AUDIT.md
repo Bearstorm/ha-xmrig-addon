@@ -45,6 +45,14 @@ An additional guarded smoke script `tests/runtime/test_haos_candidate_smoke.py` 
 
 The full acceptance criteria and manual rollback plan are in `docs/HAOS_BETA_ACCEPTANCE.md`. Beta remains blocked until a disposable HAOS installation validates MQTT service access and startup behavior.
 
+## Step 38: Separate experimental HAOS beta package
+
+A standalone Home Assistant add-on folder `xmrig_haos_beta/` was added to the development branch with independent `config.yaml`, `Dockerfile`, and packaged Python sources. The distinct slug `xmrig_haos_beta`, `stage: experimental`, `boot: manual`, empty wallet and `mqtt:want` avoid replacing the existing stable add-on. It can be **built locally from its own folder** for an approved disposable HAOS evaluation; it is not automatically published to GHCR and is not available from the default production branch.
+
+Beta MQTT identities are namespaced to `xmrig_haos_beta` and use a unique MQTT client ID. The CI validation checks the stable-vs-beta permission boundary and the runtime workflow independently builds `xmrig_haos_beta/` and verifies the entrypoint with a guarded OFF smoke test. This still does not replace real HAOS Supervisor or Protection Mode validation.
+
+**Important:** GitHub repository add-on discovery uses the branch/repository actually configured in Home Assistant. The development-only beta folder does not imply availability through the normal stable repository URL. Do not change the user's production repository configuration for this test. Use a separate staging environment and follow `docs/HAOS_BETA_ACCEPTANCE.md`.
+
 ## Safe release sequence
 
 1. Keep previous HAOS image and configuration as rollback target; back up Home Assistant.
