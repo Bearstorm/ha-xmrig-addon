@@ -16,6 +16,11 @@ class CommandMailboxTests(unittest.TestCase):
     def setUp(self):
         self.box = module.CommandMailbox()
 
+    def test_clear_on_disconnect(self):
+        self.box.submit("xmrig_haos/command", b"ON")
+        self.box.clear()
+        self.assertIsNone(self.box.take())
+
     def test_on(self):
         self.assertTrue(self.box.submit("xmrig_haos/command", b"ON"))
         self.assertEqual(self.box.take(), "ON")
