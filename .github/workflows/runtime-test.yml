@@ -7,6 +7,17 @@ on:
       - develop-v2
     paths:
       - ".github/workflows/runtime-test.yml"
+      - "xmrig_haos/**"
+      - "tests/runtime/**"
+
+  pull_request:
+    branches:
+      - main
+      - develop-v2
+    paths:
+      - ".github/workflows/runtime-test.yml"
+      - "xmrig_haos/**"
+      - "tests/runtime/**"
 
   workflow_dispatch:
 
@@ -125,7 +136,9 @@ jobs:
             "--no-huge-pages" \
             "--keepalive" \
             "--randomx-mode" \
-            "--tls"
+            "--tls" \
+            "--http-host" \
+            "--http-port"
           do
             if grep -Fq -- "$option" xmrig-help.txt; then
               echo "PASS: $option"
@@ -189,6 +202,8 @@ jobs:
       - name: Runtime test summary
         shell: bash
         run: |
+          set -euo pipefail
+
           echo "======================================"
           echo "XMRig HAOS isolated runtime test"
           echo "======================================"
@@ -199,3 +214,102 @@ jobs:
           echo "Real Home Assistant: not affected"
           echo "======================================"
           echo "All isolated runtime checks passed."
+
+  python-controller-runtime:
+    name: Test Python Controller in isolated Docker
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+      # ------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # ------------------------------------------
+      # 2. Prepare Docker Buildx
+      # ------------------------------------------
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # ------------------------------------------
+      # 3. Verify test source files
+      # ------------------------------------------
+
+      - name: Verify Python runtime test sources
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f tests/runtime/Dockerfile
+          test -f tests/runtime/test_runtime_controller.py
+
+          test -f xmrig_haos/rootfs/app/config.py
+          test -f xmrig_haos/rootfs/app/miner_manager.py
+          test -f xmrig_haos/rootfs/app/main.py
+          test -f xmrig_haos/rootfs/app/xmrig_monitor.py
+
+          echo "PASS: Runtime test sources exist"
+
+      # ------------------------------------------
+      # 4. Build isolated Python test image
+      # ------------------------------------------
+
+      - name: Build Python Controller test image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./tests/runtime/Dockerfile
+          load: true
+          push: false
+          tags: xmrig-python-controller-test:local
+
+      # ------------------------------------------
+      # 5. Run isolated integration tests
+      # ------------------------------------------
+
+      - name: Run Python Controller Docker runtime tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            xmrig-python-controller-test:local
+
+          echo "PASS: Python Controller Docker runtime tests"
+
+      # ------------------------------------------
+      # 6. Final summary
+      # ------------------------------------------
+
+      - name: Python Controller runtime summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "XMRig Python Controller runtime tests"
+          echo "======================================"
+          echo "Test image: isolated Python 3.12"
+          echo "Network: disabled"
+          echo "Filesystem: read-only except /tmp"
+          echo "Mining: simulated subprocess only"
+          echo "MQTT: not required"
+          echo "GHCR publishing: disabled"
+          echo "Production HAOS: not affected"
+          echo "======================================"
+          echo "All Python Controller runtime checks passed."
