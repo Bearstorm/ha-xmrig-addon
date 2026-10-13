@@ -102,14 +102,14 @@ class LocalBrokerTests(unittest.TestCase):
             self.assertTrue(ready.wait(5))
             discovery = []
             until = time.monotonic() + 6
-            while len(discovery) < 8 and time.monotonic() < until:
+            while len(discovery) < 9 and time.monotonic() < until:
                 try:
                     discovery.append(items.get(timeout=max(0.01, until - time.monotonic())))
                 except queue.Empty:
                     break
-            self.assertEqual(len(discovery), 8)
+            self.assertEqual(len(discovery), 9)
             self.assertTrue(all(item[2] for item in discovery))
-            self.assertEqual(len({item[0] for item in discovery}), 8)
+            self.assertEqual(len({item[0] for item in discovery}), 9)
             for topic, payload, retained in discovery:
                 self.assertIn("unique_id", json.loads(payload))
                 self.assertNotIn(b"wallet", payload)
