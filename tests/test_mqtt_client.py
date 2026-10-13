@@ -101,7 +101,7 @@ class PublisherTests(unittest.TestCase):
         self.pub.start()
         self.client.connected()
         self.assertTrue(self.pub.connected)
-        self.assertEqual(len(self.client.records), 8)
+        self.assertEqual(len(self.client.records), 9)
         self.assertTrue(all(m[3] for m in self.client.records))
 
     def test_republish_discovery_on_reconnect(self):
@@ -110,13 +110,13 @@ class PublisherTests(unittest.TestCase):
         self.client.disconnected()
         self.assertFalse(self.pub.connected)
         self.client.connected()
-        self.assertEqual(len(self.client.records), 16)
+        self.assertEqual(len(self.client.records), 18)
 
     def test_telemetry_messages(self):
         self.pub.start()
         self.client.connected()
         self.assertTrue(self.pub.publish(MinerSnapshot(True, hashrate_10s=99), process_running=True))
-        self.assertEqual(len(self.client.records), 11)
+        self.assertEqual(len(self.client.records), 12)
         self.assertIn("99", self.client.records[-1][1])
         self.assertFalse(self.client.records[-1][3])
 
