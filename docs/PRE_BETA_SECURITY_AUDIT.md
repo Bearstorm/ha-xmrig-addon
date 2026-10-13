@@ -80,3 +80,12 @@ Keep the existing `README.md` style, language (English), title, badges, two-vari
 - Keep the existing Supervised/MSR implementation for legacy users unless separate compatibility and migration decisions are approved.
 - Review README installation table, badges, supported-platform text, comparison, MSR notes, troubleshooting and compatibility matrix together for consistent wording.
 - Do not describe Python/MQTT candidate functionality as available in a published release until its production artifact is actually approved and shipped.
+
+
+## Step 40: README truth review completed on develop-v2
+
+The original English README styling, title, badges, tables, navigation, author support and PayPal link were preserved while correcting unsupported platform claims and generic performance numbers. The current stable HAOS Safe image is explicitly described as Bash `run.sh` without deployed MQTT telemetry/switch. The Python/MQTT features are described exclusively as isolated experimental beta functions, not as shipped stable capabilities. Legacy Home Assistant Supervised is identified as an unsupported installation method; Debian Bookworm is identified as a container base, not proof of Supervised support.
+
+The `scripts/check_readme.py` validation guard checks the described stable/beta entrypoints, addon slugs, supported option names, basic source/manifest truths and author branding. The guard runs inside `.github/workflows/test.yml`. This is static consistency validation, not real HAOS user acceptance; run the full pre-release review again after any production-image changes.
+
+Readme development edits are not a release approval. Public publication, merge to main or GHCR changes require the separately agreed release process.
