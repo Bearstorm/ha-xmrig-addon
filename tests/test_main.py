@@ -17,7 +17,7 @@ PACKAGE = "xmrig_controller_test_app"
 pkg = types.ModuleType(PACKAGE)
 pkg.__path__ = [str(APP_DIR)]
 sys.modules[PACKAGE] = pkg
-for name in ("config", "miner_manager", "main"):
+for name in ("config", "miner_manager", "xmrig_monitor", "main"):
     spec = importlib.util.spec_from_file_location(
         f"{PACKAGE}.{name}", APP_DIR / f"{name}.py"
     )
@@ -30,6 +30,7 @@ controller_module = sys.modules[f"{PACKAGE}.main"]
 manager_module = sys.modules[f"{PACKAGE}.miner_manager"]
 config_module = sys.modules[f"{PACKAGE}.config"]
 Controller = controller_module.Controller
+MinerSnapshot = sys.modules[f"{PACKAGE}.xmrig_monitor"].MinerSnapshot
 MinerState = manager_module.MinerState
 MinerError = manager_module.MinerError
 
@@ -38,6 +39,7 @@ class FakeManager:
     def __init__(self, states=None, *, start_result=True):
         self.states = iter(states or [MinerState.RUNNING])
         self.state = MinerState.STOPPED
+        self.pid = 4321
         self.desired_running = True
         self.retry_at = None
         self.last_error = None
@@ -59,6 +61,8 @@ class FakeManager:
         if self.reconcile_exception:
             raise self.reconcile_exception
         self.state = next(self.states, self.state)
+        if self.state != MinerState.RUNNING:
+            self.pid = None
         if self.on_reconcile:
             self.on_reconcile()
         return self.state
@@ -155,6 +159,114 @@ class ControllerTests(unittest.TestCase):
         source = (APP_DIR / "main.py").read_text(encoding="utf-8")
         self.assertNotIn("import paho", source)
         self.assertNotIn("import mqtt", source)
+
+
+class FakeMonitor:
+    def __init__(self, result=None):
+        self.result = result or MinerSnapshot(True, hashrate_10s=123.0)
+        self.calls = 0
+        self.started = threading.Event()
+        self.proceed = threading.Event()
+        self.block = False
+        self.raise_error = False
+
+    def poll(self):
+        self.calls += 1
+        self.started.set()
+        if self.block:
+            self.proceed.wait(1.0)
+        if self.raise_error:
+            raise RuntimeError("secret from API")
+        return self.result
+
+
+class MonitoringControllerTests(unittest.TestCase):
+    def test_no_monitor_keeps_existing_flow(self):
+        manager = FakeManager()
+        stop = threading.Event()
+        manager.on_reconcile = stop.set
+        controller = Controller(manager, stop_event=stop, poll_interval=0.001)
+        self.assertEqual(controller.run(), 0)
+        self.assertFalse(controller.snapshot.api_available)
+
+    def test_monitor_reads_running_miner(self):
+        manager = FakeManager()
+        monitor = FakeMonitor()
+        controller = Controller(manager, monitor=monitor, poll_interval=0.001)
+        seen = []
+        def done():
+            if controller.snapshot.api_available:
+                seen.append(controller.snapshot.hashrate_10s)
+                controller.request_shutdown()
+        manager.on_reconcile = done
+        self.assertEqual(controller.run(), 0)
+        self.assertEqual(seen, [123.0])
+        self.assertGreaterEqual(monitor.calls, 1)
+
+    def test_api_unavailable_does_not_stop_mining(self):
+        manager = FakeManager()
+        monitor = FakeMonitor(MinerSnapshot(False, error="api_unavailable"))
+        controller = Controller(manager, monitor=monitor, poll_interval=0.001)
+        def done():
+            if monitor.started.is_set():
+                controller.request_shutdown()
+        manager.on_reconcile = done
+        self.assertEqual(controller.run(), 0)
+        self.assertEqual(manager.shutdown_calls, 1)
+
+    def test_monitor_exception_does_not_stop_mining(self):
+        manager = FakeManager()
+        monitor = FakeMonitor()
+        monitor.raise_error = True
+        controller = Controller(manager, monitor=monitor, poll_interval=0.001)
+        def done():
+            if monitor.started.is_set():
+                controller.request_shutdown()
+        manager.on_reconcile = done
+        self.assertEqual(controller.run(), 0)
+        self.assertEqual(manager.shutdown_calls, 1)
+
+    def test_late_response_after_process_exit_is_discarded(self):
+        manager = FakeManager(states=[MinerState.RUNNING, MinerState.ERROR])
+        manager.desired_running = True
+        manager.retry_at = 10000.0
+        monitor = FakeMonitor()
+        monitor.block = True
+        controller = Controller(manager, monitor=monitor, poll_interval=0.001)
+        counter = [0]
+        def done():
+            counter[0] += 1
+            if counter[0] == 1:
+                monitor.started.wait(0.5)
+            if counter[0] >= 2:
+                monitor.proceed.set()
+                controller.request_shutdown()
+        manager.on_reconcile = done
+        self.assertEqual(controller.run(), 0)
+        self.assertFalse(controller.snapshot.api_available)
+        self.assertEqual(controller.snapshot.error, "miner_not_running")
+
+    def test_invalid_monitor_interval(self):
+        with self.assertRaises(ValueError):
+            Controller(FakeManager(), monitor_interval=0)
+
+    def test_main_factory_failure_is_handled(self):
+        self.assertEqual(controller_module.main(
+            config_loader=lambda: object(),
+            manager_factory=lambda config: (_ for _ in ()).throw(ValueError("bad")),
+            install_signals=False,
+        ), 1)
+
+    def test_main_monitor_factory_failure_is_optional(self):
+        manager = FakeManager(states=[MinerState.ERROR])
+        manager.desired_running = False
+        self.assertEqual(controller_module.main(
+            config_loader=lambda: object(),
+            manager_factory=lambda config: manager,
+            monitor_factory=lambda: (_ for _ in ()).throw(ValueError("no api")),
+            install_signals=False,
+        ), 1)
+        self.assertEqual(manager.shutdown_calls, 1)
 
 
 if __name__ == "__main__":
