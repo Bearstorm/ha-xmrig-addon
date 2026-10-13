@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .mqtt_discovery import DiscoveryPayloads, MqttMessage
+from .mqtt_commands import CommandMailbox
 from .mqtt_service import BrokerSettings
 from .xmrig_monitor import MinerSnapshot
 
@@ -26,10 +27,12 @@ class MqttPublisher:
         *,
         discovery: DiscoveryPayloads | None = None,
         client_factory: Callable[[], Any] | None = None,
+        commands: CommandMailbox | None = None,
     ) -> None:
         self._settings = settings
         self._discovery = discovery if discovery is not None else DiscoveryPayloads()
         self._factory = client_factory
+        self.commands = commands if commands is not None else CommandMailbox()
         self._client: Any = None
         self._lock = threading.RLock()
         self._started = False
@@ -76,8 +79,21 @@ class MqttPublisher:
                     if not self._publish(client, msg):
                         LOG.warning("MQTT Discovery publish was not accepted")
                         break
+                result = client.subscribe(self._discovery.command_topic, qos=1)
+                if result[0] != 0:
+                    LOG.warning("MQTT control subscription was not accepted")
             except (OSError, RuntimeError, ValueError):
                 LOG.warning("MQTT Discovery publishing failed")
+
+    def _on_message(self, client: Any, userdata: Any, message: Any) -> None:
+        if self._closed or client is not self._client:
+            return
+        try:
+            self.commands.submit(message.topic, message.payload,
+                                 retained=bool(message.retain),
+                                 expected_topic=self._discovery.command_topic)
+        except (AttributeError, ValueError, TypeError):
+            LOG.warning("Invalid MQTT command ignored")
 
     def _on_disconnect(self, client: Any, userdata: Any, flags: Any,
                        reason_code: Any, properties: Any = None) -> None:
@@ -94,6 +110,7 @@ class MqttPublisher:
                 client = self._new_client()
                 client.on_connect = self._on_connect
                 client.on_disconnect = self._on_disconnect
+                client.on_message = self._on_message
                 if self._settings.username is not None:
                     client.username_pw_set(self._settings.username, self._settings.password)
                 if self._settings.tls:
