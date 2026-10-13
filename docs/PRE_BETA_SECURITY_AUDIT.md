@@ -33,7 +33,9 @@ The isolated Docker runtime suite now includes four additional tests:
 
 The integration suite has 9 real-subprocess mock tests, 5 real-Mosquitto tests, and a separate validation suite of 226 scenarios, all verified in GitHub Actions for step 35. These tests do **not** prove real HAOS Supervisor interoperability.
 
-**Remaining persistence caveat:** If a disk fails while persisting OFF, the controller still stops XMRig, but a previously saved ON might survive and allow a new startup later. This case requires explicit recovery policy and testing before beta.
+**Step 36 persistence safeguard:** Before starting XMRig, the Controller atomically creates `/data/xmrig_state.json.armed` and fsyncs it. A stored ON without this marker can start; a leftover marker suppresses automatic startup (unexpected shutdown or failed OFF write). On a verified graceful shutdown with ON saved, it clears the marker so automatic ON restart still works. A successfully saved OFF clears it as well. Guard creation failures block mining. This is covered by 4 new state-store unit tests and 2 new mock-child Docker tests; restart behavior is not yet verified on actual HAOS.
+
+**Storage limitation:** No userspace code can guarantee persistence if the underlying storage loses acknowledged writes, is irreparably damaged, or the whole volume disappears. The fail-closed guard handles ordinary write exceptions and unclean shutdowns when earlier durable guard creation succeeded; HAOS hardware testing remains required.
 
 ## Safe release sequence
 
