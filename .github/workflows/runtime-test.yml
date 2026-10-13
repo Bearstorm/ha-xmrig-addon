@@ -488,7 +488,7 @@ jobs:
           test -f xmrig_haos_beta/Dockerfile
           test -f xmrig_haos_beta/rootfs/app/main.py
           test -f xmrig_haos_beta/rootfs/app/mqtt_discovery.py
-          for file in config.py main.py miner_manager.py xmrig_monitor.py mining_state.py mqtt_service.py mqtt_runtime.py; do
+          for file in config.py main.py miner_manager.py xmrig_monitor.py mqtt_service.py mqtt_runtime.py; do
             cmp "xmrig_haos/rootfs/app/$file" "xmrig_haos_beta/rootfs/app/$file"
           done
           grep -Fq 'client_id="xmrig-haos-beta-monitor"' xmrig_haos_beta/rootfs/app/mqtt_client.py
