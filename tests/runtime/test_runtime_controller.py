@@ -262,8 +262,14 @@ class ControllerRuntimeTests(unittest.TestCase):
         class FailingStateStore:
             def load(self):
                 return False
+            def guard_exists(self):
+                return False
+            def arm(self):
+                pass
             def save(self, running):
                 raise StateStoreError("simulated disk failure")
+            def disarm(self):
+                pass
 
         manager = self.manager()
         pub = StubPublisher()
@@ -279,6 +285,66 @@ class ControllerRuntimeTests(unittest.TestCase):
             thread.join(timeout=5)
         self.assertFalse(thread.is_alive())
         self.assertEqual(result, [0])
+
+    def test_failed_off_write_retains_guard_across_restart(self):
+        store = MiningStateStore(self.root / "xmrig_state.json")
+        manager = self.manager()
+        pub = StubPublisher()
+        controller, worker, results = self._run_controller_thread(manager, store, pub)
+        try:
+            self.assertTrue(self.wait_for(lambda: manager.pid is not None))
+            self.assertTrue(store.guard_exists())
+            original_save = store.save
+            def failing_off(running):
+                if not running:
+                    raise StateStoreError("simulated OFF disk failure")
+                return original_save(running)
+            with patch.object(store, "save", side_effect=failing_off):
+                pub.commands.submit("xmrig_haos/command", b"OFF")
+                self.assertTrue(self.wait_for(
+                    lambda: not manager.desired_running and manager.pid is None
+                ))
+                self.assertTrue(store.guard_exists())
+        finally:
+            controller.request_shutdown()
+            worker.join(timeout=5)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(results, [0])
+        self.assertTrue(store.guard_exists())
+
+        second = self.manager()
+        controller2, worker2, results2 = self._run_controller_thread(second, store, StubPublisher())
+        try:
+            time.sleep(0.2)
+            self.assertIsNone(second.pid)
+            self.assertEqual(second.state, MinerState.STOPPED)
+        finally:
+            controller2.request_shutdown()
+            worker2.join(timeout=5)
+        self.assertEqual(results2, [0])
+
+    def test_graceful_on_restart_allows_autostart(self):
+        store = MiningStateStore(self.root / "xmrig_state.json")
+        store.save(True)
+        first = self.manager()
+        controller, worker, results = self._run_controller_thread(first, store)
+        try:
+            self.assertTrue(self.wait_for(lambda: first.pid is not None))
+        finally:
+            controller.request_shutdown()
+            worker.join(timeout=5)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(results, [0])
+        self.assertFalse(store.guard_exists())
+        second = self.manager()
+        controller2, worker2, results2 = self._run_controller_thread(second, store)
+        try:
+            self.assertTrue(self.wait_for(lambda: second.pid is not None))
+        finally:
+            controller2.request_shutdown()
+            worker2.join(timeout=5)
+        self.assertFalse(worker2.is_alive())
+        self.assertEqual(results2, [0])
 
     def test_off_command_cancels_crash_retries(self):
         with patch.dict(os.environ, {"MOCK_XMRIG_CRASH": "1"}):
