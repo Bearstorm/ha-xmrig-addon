@@ -82,6 +82,26 @@ class LocalBrokerTests(unittest.TestCase):
         self.assertEqual(len(found), count, f"only {len(found)} of {count} matching MQTT messages")
         return found
 
+    def test_retained_start_command_not_replayed_after_restart(self):
+        # A stale retained ON must never automatically start a restarted miner.
+        self.publisher.close()
+        retained = self.observer.publish(
+            "xmrig_haos/command", "ON", qos=1, retain=True
+        )
+        retained.wait_for_publish(timeout=3)
+        replacement = MqttPublisher(BrokerSettings(HOST, PORT))
+        self.publisher = replacement
+        try:
+            self.assertTrue(replacement.start())
+            self.assertTrue(self._wait_until(lambda: replacement.connected, 6))
+            time.sleep(0.3)
+            self.assertIsNone(replacement.commands.take())
+        finally:
+            removal = self.observer.publish(
+                "xmrig_haos/command", b"", qos=1, retain=True
+            )
+            removal.wait_for_publish(timeout=3)
+
     def test_non_retained_mining_command_reaches_mailbox(self):
         # Never connect the commands directly to a mining process in CI.
         self.observer.publish("xmrig_haos/command", "OFF", qos=1, retain=False)
