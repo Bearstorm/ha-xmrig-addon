@@ -22,6 +22,10 @@ except ImportError:
     raise
 
 
+HTTP_API_HOST = "127.0.0.1"
+HTTP_API_PORT = 18080
+
+
 class MinerError(RuntimeError):
     """A process-control failure, without credentials or command-line details."""
 
@@ -103,6 +107,9 @@ def build_xmrig_args(config: MinerConfig, memory_bytes: int) -> list[str]:
         "--no-huge-pages",
         "--keepalive",
         f"--randomx-mode={randomx_mode(memory_bytes)}",
+        # The restricted XMRig telemetry API remains inside this container.
+        f"--http-host={HTTP_API_HOST}",
+        f"--http-port={HTTP_API_PORT}",
     ]
     if config.tls_enabled:
         args.append("--tls")
