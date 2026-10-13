@@ -119,3 +119,12 @@ A separate `tests/test_main.py` unit test verifies that the SIGTERM handler requ
 `tests/runtime/test_beta_sigterm.py` creates a harmless executable Python mock child in a temporary directory. An independent Controller process runs the actual beta `app.main.main()` with operating-system signal handlers installed and a saved ON preference. The test sends **real SIGTERM to that Controller process**, waits for its clean exit, verifies the mock child PID no longer exists and that the durable crash guard has been removed while ON was preserved for a graceful restart. The CI Docker execution is network-disabled, uses a read-only root filesystem and limited CPU/memory/PIDs, and does **not** launch XMRig or contact a pool.
 
 Scope limitation: this verifies Linux process and signal behavior in a self-contained Docker runner, not Home Assistant Supervisor delivering signals to a real add-on. Staging HAOS Supervisor shutdown/start/rollback is still a release blocker.
+
+
+## Steps 46–47: hard-crash and damaged-state acceptance gates
+
+**Step 46:** `tests/runtime/test_beta_hard_crash.py` starts the real beta Controller with a harmless mock executable, sends operating-system `SIGKILL` to its Controller process, verifies that the durable `.armed` crash guard remains despite the previously saved ON preference, and starts a fresh Controller that must stay OFF. Because SIGKILL bypasses cleanup, the test separately terminates the disposable orphan mock. **A hard-killed Controller does not itself guarantee that an existing child process immediately terminates**; Docker/HAOS cgroup and Supervisor behavior still need an actual staging-system validation.
+
+**Step 47:** `tests/runtime/test_beta_state_recovery.py` exercises absent state, malformed JSON, incorrect types/schema version, corrupted guard contents, non-file guard and leftover valid guard; every attempt to start a miner raises a test failure. A valid persisted OFF must still allow a safe idle start. These tests run in the standalone beta Docker image without a mining pool, network, actual XMRig or Home Assistant credentials.
+
+CI result evidence: see the matching isolated runtime workflow before marking these items passed. Both scenarios remain development-only, not substitutes for a disposable HAOS test with Protection Mode ON.
