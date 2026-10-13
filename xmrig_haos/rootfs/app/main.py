@@ -40,6 +40,12 @@ class MonitorProtocol(Protocol):
     def poll(self) -> MinerSnapshot: ...
 
 
+class PublisherProtocol(Protocol):
+    def start(self) -> bool: ...
+    def publish(self, snapshot: MinerSnapshot, *, process_running: bool) -> bool: ...
+    def close(self) -> None: ...
+
+
 class Controller:
     """Supervise one miner and optionally sample its metrics in a worker thread."""
 
@@ -51,6 +57,7 @@ class Controller:
         stop_event: threading.Event | None = None,
         monitor: MonitorProtocol | None = None,
         monitor_interval: float = MONITOR_INTERVAL_SECONDS,
+        publisher: PublisherProtocol | None = None,
     ) -> None:
         if poll_interval <= 0 or monitor_interval <= 0:
             raise ValueError("poll intervals must be positive")
@@ -58,6 +65,7 @@ class Controller:
         self._poll_interval = poll_interval
         self._stop_event = stop_event if stop_event is not None else threading.Event()
         self._monitor = monitor
+        self._publisher = publisher
         self._monitor_interval = monitor_interval
         self._monitor_stop = threading.Event()
         self._monitor_wake = threading.Event()
@@ -107,6 +115,7 @@ class Controller:
                 # Never disclose HTTP error bodies, credentials, or URLs.
                 LOG.warning("XMRig telemetry polling failed")
                 sample = MinerSnapshot(False, error="monitor_error")
+            publish_snapshot = False
             with self._snapshot_lock:
                 if (
                     not self._monitor_stop.is_set()
@@ -114,13 +123,29 @@ class Controller:
                     and self._generation == generation
                 ):
                     self._snapshot = sample
+                    publish_snapshot = True
+            if publish_snapshot:
+                self._publish_snapshot(sample, process_running=True)
             self._monitor_wake.wait(timeout=self._monitor_interval)
             self._monitor_wake.clear()
+
+    def _publish_snapshot(self, snapshot: MinerSnapshot, *, process_running: bool) -> None:
+        if self._publisher is None:
+            return
+        try:
+            self._publisher.publish(snapshot, process_running=process_running)
+        except Exception:
+            LOG.warning("Optional MQTT publisher failed; mining continues")
 
     def run(self) -> int:
         """Run until signalled or retries are exhausted; always reap miner."""
         exit_code = 0
         try:
+            if self._publisher is not None and not self._stop_event.is_set():
+                try:
+                    self._publisher.start()
+                except Exception:
+                    LOG.warning("Optional MQTT startup failed; mining continues")
             if self._monitor is not None and not self._stop_event.is_set():
                 self._monitor_thread = threading.Thread(
                     target=self._monitor_loop, name="xmrig-telemetry", daemon=True
@@ -162,6 +187,11 @@ class Controller:
                     exit_code = 1
             with self._snapshot_lock:
                 self._snapshot = MinerSnapshot(False, error="miner_not_running")
+            if self._publisher is not None:
+                try:
+                    self._publisher.close()
+                except Exception:
+                    LOG.warning("Optional MQTT shutdown failed")
         return exit_code
 
 
