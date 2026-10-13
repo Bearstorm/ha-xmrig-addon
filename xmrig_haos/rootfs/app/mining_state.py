@@ -35,7 +35,7 @@ class MiningStateStore:
             data = json.loads(raw)
         except (ValueError, UnicodeError):
             raise StateStoreError("Invalid mining state") from None
-        if not isinstance(data, dict) or data != {"version": 1, "running": data.get("running")}:
+        if not isinstance(data, dict) or set(data) != {"version", "running"} or data["version"] != 1:
             raise StateStoreError("Invalid mining state schema")
         if not isinstance(data["running"], bool):
             raise StateStoreError("Invalid mining state value")
