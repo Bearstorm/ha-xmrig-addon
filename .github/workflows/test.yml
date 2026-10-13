@@ -54,6 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/check_readme.py
+          python scripts/check_beta_security.py
 
       # 3. Validate startup scripts
       # ------------------------------------------
