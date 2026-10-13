@@ -465,3 +465,57 @@ jobs:
           if test -f /tmp/xmrig-test-mqtt.pid; then
             kill "$(cat /tmp/xmrig-test-mqtt.pid)" || true
           fi
+
+  beta-addon-package:
+    name: Build installable standalone HAOS beta addon safely
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Verify beta package independent of stable addon
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f xmrig_haos_beta/config.yaml
+          test -f xmrig_haos_beta/Dockerfile
+          test -f xmrig_haos_beta/rootfs/app/main.py
+          test -f xmrig_haos_beta/rootfs/app/mqtt_discovery.py
+          for file in config.py main.py miner_manager.py xmrig_monitor.py mining_state.py mqtt_service.py mqtt_runtime.py; do
+            cmp "xmrig_haos/rootfs/app/$file" "xmrig_haos_beta/rootfs/app/$file"
+          done
+          grep -Fq 'client_id="xmrig-haos-beta-monitor"' xmrig_haos_beta/rootfs/app/mqtt_client.py
+          grep -Fq 'xmrig_haos_beta/command' xmrig_haos_beta/rootfs/app/mqtt_commands.py
+          grep -Fq 'node_id: str = "xmrig_haos_beta"' xmrig_haos_beta/rootfs/app/mqtt_discovery.py
+          grep -Fq 'base_topic: str = "xmrig_haos_beta"' xmrig_haos_beta/rootfs/app/mqtt_discovery.py
+          echo "PASS: isolated beta package and shared source consistency"
+
+      - name: Build beta add-on directly from its HAOS directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --tag xmrig-haos-beta:local ./xmrig_haos_beta
+
+      - name: Validate beta entrypoint and independent startup without mining
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect xmrig-haos-beta:local --format '{{json .Config.Entrypoint}}')" = '["/opt/xmrig-venv/bin/python","-m","app.main"]'
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_haos_candidate_smoke.py
+          echo "PASS: standalone beta add-on builds and boots safely OFF"
