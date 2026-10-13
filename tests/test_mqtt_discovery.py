@@ -26,8 +26,8 @@ class DiscoveryTests(unittest.TestCase):
     def setUp(self):
         self.builder = DiscoveryPayloads()
 
-    def test_has_eight_entities(self):
-        self.assertEqual(len(self.builder.discovery_messages()), 8)
+    def test_has_nine_entities(self):
+        self.assertEqual(len(self.builder.discovery_messages()), 9)
 
     def test_unique_topics(self):
         topics = [m.topic for m in self.builder.discovery_messages()]
