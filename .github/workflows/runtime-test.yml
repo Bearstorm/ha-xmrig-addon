@@ -383,3 +383,66 @@ jobs:
             -c 'import paho.mqtt.client as mqtt; assert mqtt.CallbackAPIVersion.VERSION2; print("PASS: MQTT dependency available in candidate")'
 
           echo "PASS: HAOS Python candidate builds and imports; no mining started"
+
+  local-mqtt-integration:
+    name: Test MQTT against isolated loopback Mosquitto
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install local MQTT test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y mosquitto
+          python -m pip install --disable-pip-version-check "paho-mqtt==2.1.0"
+
+      - name: Start loopback-only disposable Mosquitto broker
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/xmrig-test-mosquitto.conf <<'EOF'
+          listener 18883 127.0.0.1
+          allow_anonymous true
+          persistence false
+          log_dest stdout
+          EOF
+          mosquitto -c /tmp/xmrig-test-mosquitto.conf > /tmp/xmrig-test-mqtt.log 2>&1 &
+          echo "$!" > /tmp/xmrig-test-mqtt.pid
+          python - <<'PY'
+          import socket
+          import time
+          for attempt in range(60):
+              try:
+                  with socket.create_connection(("127.0.0.1", 18883), timeout=0.5):
+                      print("PASS: isolated loopback MQTT broker listening")
+                      break
+              except OSError:
+                  time.sleep(0.1)
+          else:
+              raise RuntimeError("local test broker did not start")
+          PY
+
+      - name: Run real-broker MQTT integration tests without mining
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests/runtime \
+            -p 'test_mqtt_broker.py' \
+            -v
+
+      - name: Stop disposable MQTT broker
+        if: always()
+        shell: bash
+        run: |
+          if test -f /tmp/xmrig-test-mqtt.pid; then
+            kill "$(cat /tmp/xmrig-test-mqtt.pid)" || true
+          fi
