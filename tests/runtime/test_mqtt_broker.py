@@ -112,13 +112,17 @@ class LocalBrokerTests(unittest.TestCase):
             self.assertEqual(len({item[0] for item in discovery}), 8)
             for topic, payload, retained in discovery:
                 self.assertIn("unique_id", json.loads(payload))
-                self.assertNotIn("wallet", payload)
+                self.assertNotIn(b"wallet", payload)
         finally:
             observer2.disconnect()
             observer2.loop_stop()
 
     def test_telemetry_and_availability_reach_real_broker(self):
         snapshot = MinerSnapshot(True, hashrate_10s=123.5, accepted=7, pool_connected=True)
+        # Retained availability from earlier tests must not count as new output.
+        time.sleep(0.15)
+        while not self.messages.empty():
+            self.messages.get_nowait()
         self.assertTrue(self.publisher.publish(snapshot, process_running=True))
         msgs = self._collect(lambda m: m[0] in {
             "xmrig_haos/telemetry", "xmrig_haos/api_availability",
