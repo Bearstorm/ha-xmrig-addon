@@ -45,30 +45,28 @@ def protected_manager(config):
 
 
 def run_off_boot(description: str) -> None:
-    timer = threading.Timer(0.25, lambda: stop.set())
-    stop = threading.Event()
-    # main() builds a fresh Controller so capture it using its request_shutdown
+    # main() creates the real Controller; give the run a bounded shutdown.
     original_cls = beta_main.Controller
 
     class TimedController(original_cls):
         def run(self):
-            timer.function = self.request_shutdown
+            timer = threading.Timer(0.25, self.request_shutdown)
             timer.start()
-            return super().run()
+            try:
+                return super().run()
+            finally:
+                timer.cancel()
+                timer.join(timeout=2)
 
     with patch.object(beta_main, "Controller", TimedController):
-        try:
-            result = beta_main.main(
-                config_loader=load_config,
-                manager_factory=protected_manager,
-                monitor_factory=lambda: None,
-                publisher_factory=lambda: None,
-                state_store_factory=MiningStateStore,
-                install_signals=False,
-            )
-        finally:
-            if timer.is_alive():
-                timer.join(timeout=2)
+        result = beta_main.main(
+            config_loader=load_config,
+            manager_factory=protected_manager,
+            monitor_factory=lambda: None,
+            publisher_factory=lambda: None,
+            state_store_factory=MiningStateStore,
+            install_signals=False,
+        )
     assert result == 0, f"{description}: Controller result {result}"
     print("PASS: " + description)
 
