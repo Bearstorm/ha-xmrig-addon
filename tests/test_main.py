@@ -45,6 +45,7 @@ class FakeManager:
         self.last_error = None
         self.start_calls = 0
         self.shutdown_calls = 0
+        self.stop_calls = 0
         self.start_result = start_result
         self.start_exception = None
         self.reconcile_exception = None
@@ -66,6 +67,12 @@ class FakeManager:
         if self.on_reconcile:
             self.on_reconcile()
         return self.state
+
+    def stop(self, timeout=10.0):
+        self.stop_calls += 1
+        self.desired_running = False
+        self.pid = None
+        self.state = MinerState.STOPPED
 
     def shutdown(self, timeout=10.0):
         self.shutdown_calls += 1
@@ -279,6 +286,7 @@ class FakePublisher:
         self.closed = 0
         self.records = []
         self.published = threading.Event()
+        self.commands = None
 
     def start(self):
         self.started += 1
@@ -300,6 +308,51 @@ class FakePublisher:
 
 
 class MqttControllerTests(unittest.TestCase):
+    def test_off_command_stops_without_killing_controller(self):
+        from importlib import import_module
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("controller_command_mailbox", APP_DIR / "mqtt_commands.py")
+        cmd_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cmd_mod)
+        manager = FakeManager(states=[MinerState.RUNNING, MinerState.STOPPED])
+        publisher = FakePublisher()
+        publisher.commands = cmd_mod.CommandMailbox()
+        controller = Controller(manager, publisher=publisher, poll_interval=0.001)
+        count = [0]
+        def callback():
+            count[0] += 1
+            if count[0] == 1:
+                publisher.commands.submit("xmrig_haos/command", b"OFF")
+            if count[0] >= 3:
+                controller.request_shutdown()
+        manager.on_reconcile = callback
+        self.assertEqual(controller.run(), 0)
+        self.assertEqual(manager.stop_calls, 1)
+        self.assertEqual(manager.start_calls, 1)
+
+    def test_on_after_off_restarts_once(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("controller_command_mailbox_two", APP_DIR / "mqtt_commands.py")
+        cmd_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cmd_mod)
+        manager = FakeManager()
+        publisher = FakePublisher()
+        publisher.commands = cmd_mod.CommandMailbox()
+        controller = Controller(manager, publisher=publisher, poll_interval=0.001)
+        count = [0]
+        def callback():
+            count[0] += 1
+            if count[0] == 1:
+                publisher.commands.submit("xmrig_haos/command", b"OFF")
+            elif count[0] == 2:
+                publisher.commands.submit("xmrig_haos/command", b"ON")
+            elif count[0] >= 4:
+                controller.request_shutdown()
+        manager.on_reconcile = callback
+        self.assertEqual(controller.run(), 0)
+        self.assertEqual(manager.stop_calls, 1)
+        self.assertEqual(manager.start_calls, 2)
+
     def test_mqtt_is_optional(self):
         manager = FakeManager()
         stop = threading.Event()
@@ -368,7 +421,7 @@ class MqttControllerTests(unittest.TestCase):
                 controller.request_shutdown()
         manager.on_reconcile = done
         self.assertEqual(controller.run(), 0)
-        self.assertEqual(publisher.records, [])
+        self.assertFalse(any(running for _, running in publisher.records))
 
 
 if __name__ == "__main__":
