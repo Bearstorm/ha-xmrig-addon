@@ -384,6 +384,25 @@ jobs:
 
           echo "PASS: HAOS Python candidate builds and imports; no mining started"
 
+      - name: Smoke-test candidate OFF and crash guard without mining
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-python:local \
+            - < tests/runtime/test_haos_candidate_smoke.py
+
+          echo "PASS: Candidate OFF/restart smoke without mining"
+
   local-mqtt-integration:
     name: Test MQTT against isolated loopback Mosquitto
     runs-on: ubuntu-latest
