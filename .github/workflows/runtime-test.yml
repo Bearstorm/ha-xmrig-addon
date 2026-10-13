@@ -637,3 +637,20 @@ jobs:
             --entrypoint /opt/xmrig-venv/bin/python \
             xmrig-haos-beta:local \
             - < tests/runtime/test_beta_storage_failures.py
+
+      - name: Step 50 - verify credentials never appear in beta error logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_beta_secret_logging.py
