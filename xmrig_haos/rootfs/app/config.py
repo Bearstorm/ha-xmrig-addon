@@ -1,325 +1,317 @@
 
-"""Isolated unit tests for the HAOS Python configuration module."""
+"""Configuration validation for the XMRig HAOS Safe controller.
+
+This module has no MQTT, Home Assistant, or XMRig process dependencies.
+"""
 
 from __future__ import annotations
 
-import importlib.util
+import ipaddress
 import json
-import tempfile
-import unittest
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Mapping
 
-MODULE_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "xmrig_haos"
-    / "rootfs"
-    / "app"
-    / "config.py"
+DEFAULT_CONFIG_PATH = Path("/data/options.json")
+DEFAULT_POOL = "pool.supportxmr.com"
+DEFAULT_PORT = 443
+DEFAULT_WORKER = "HA"
+DEFAULT_THREADS = 2
+DEFAULT_PRIORITY = 2
+DEFAULT_TLS_MODE = "auto"
+
+SUPPORTED_TLS_MODES = frozenset({
+    "auto",
+    "enabled",
+    "disabled",
+})
+
+_INTEGER_PATTERN = re.compile(
+    r"^[0-9]+$",
+    re.ASCII,
 )
 
-spec = importlib.util.spec_from_file_location(
-    "xmrig_haos_config",
-    MODULE_PATH,
+_HOST_PATTERN = re.compile(
+    r"^[A-Za-z0-9._-]+$",
+    re.ASCII,
 )
 
-assert spec is not None and spec.loader is not None
-
-import sys
-
-module = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = module
-spec.loader.exec_module(module)
-
-ConfigError = module.ConfigError
-load_config = module.load_config
-parse_config = module.parse_config
+_SCHEME_PATTERN = re.compile(
+    r"^([A-Za-z][A-Za-z0-9+.-]*)://"
+)
 
 
-class ConfigurationTests(unittest.TestCase):
+class ConfigError(ValueError):
+    """Invalid miner configuration, safe to display without credentials."""
 
-    def setUp(self) -> None:
-        self.valid = {
-            "pool": "pool.supportxmr.com",
-            "port": 443,
-            "wallet": "TEST_WALLET_SECRET",
-            "worker": "HA",
-            "threads": 2,
-            "priority": 2,
-            "tls_mode": "auto",
-        }
 
-    def test_all_existing_options(self):
-        config = parse_config(self.valid)
-
-        self.assertEqual(
-            (
-                config.pool_url,
-                config.wallet,
-                config.worker,
-            ),
-            (
-                "pool.supportxmr.com:443",
-                "TEST_WALLET_SECRET",
-                "HA",
-            ),
+def _string(
+    value: Any,
+    name: str,
+    *,
+    allow_empty: bool = False,
+    max_length: int = 255,
+) -> str:
+    if not isinstance(value, str):
+        raise ConfigError(
+            f"{name} must be a string"
         )
 
-        self.assertEqual(
-            (
-                config.threads,
-                config.priority,
-                config.tls_mode,
-            ),
-            (2, 2, "auto"),
+    if (
+        (not value and not allow_empty)
+        or len(value) > max_length
+    ):
+        raise ConfigError(
+            f"{name} must contain "
+            f"{0 if allow_empty else 1} "
+            f"to {max_length} characters"
         )
 
-    def test_default_tls_when_missing(self):
-        self.valid.pop("tls_mode")
-
-        self.assertEqual(
-            parse_config(self.valid).tls_mode,
-            "auto",
+    if any(
+        ord(char) < 32 or ord(char) == 127
+        for char in value
+    ):
+        raise ConfigError(
+            f"{name} contains control characters"
         )
 
-    def test_default_optional_options(self):
-        config = parse_config({
-            "wallet": "TEST_WALLET_SECRET",
-        })
+    return value
 
-        self.assertEqual(
-            (
-                config.pool,
-                config.port,
-                config.worker,
-                config.threads,
-                config.priority,
-                config.tls_mode,
-            ),
-            (
-                "pool.supportxmr.com",
-                443,
-                "HA",
-                2,
-                2,
-                "auto",
-            ),
+
+def _integer(
+    value: Any,
+    name: str,
+    minimum: int,
+    maximum: int,
+) -> int:
+    if isinstance(value, bool):
+        raise ConfigError(
+            f"{name} must be an integer "
+            f"from {minimum} to {maximum}"
         )
 
-    def test_missing_wallet_is_rejected(self):
-        self.valid["wallet"] = ""
+    if isinstance(value, int):
+        number = value
 
-        with self.assertRaises(ConfigError):
-            parse_config(self.valid)
+    elif (
+        isinstance(value, str)
+        and _INTEGER_PATTERN.fullmatch(value)
+        and len(value) <= 16
+    ):
+        number = int(value, 10)
 
-    def test_invalid_json_root(self):
-        with self.assertRaises(ConfigError):
-            parse_config([])
-
-    def test_invalid_port_limits(self):
-        for invalid in (
-            0,
-            65536,
-            -1,
-            "wrong",
-            True,
-            1.5,
-        ):
-            with self.subTest(invalid=invalid):
-                with self.assertRaises(ConfigError):
-                    parse_config({
-                        **self.valid,
-                        "port": invalid,
-                    })
-
-    def test_invalid_threads_limits(self):
-        for invalid in (
-            0,
-            257,
-            -1,
-            False,
-            2.3,
-        ):
-            with self.subTest(invalid=invalid):
-                with self.assertRaises(ConfigError):
-                    parse_config({
-                        **self.valid,
-                        "threads": invalid,
-                    })
-
-    def test_invalid_priority_limits(self):
-        for invalid in (
-            -1,
-            6,
-            True,
-            "high",
-        ):
-            with self.subTest(invalid=invalid):
-                with self.assertRaises(ConfigError):
-                    parse_config({
-                        **self.valid,
-                        "priority": invalid,
-                    })
-
-    def test_numeric_strings(self):
-        config = parse_config({
-            **self.valid,
-            "port": "00443",
-            "threads": "04",
-            "priority": "00",
-        })
-
-        self.assertEqual(
-            (
-                config.port,
-                config.threads,
-                config.priority,
-            ),
-            (443, 4, 0),
+    else:
+        raise ConfigError(
+            f"{name} must be an integer "
+            f"from {minimum} to {maximum}"
         )
 
-    def test_tls_auto(self):
-        self.assertTrue(
-            parse_config(self.valid).tls_enabled
+    if not minimum <= number <= maximum:
+        raise ConfigError(
+            f"{name} must be between "
+            f"{minimum} and {maximum}"
         )
 
-        self.assertFalse(
-            parse_config({
-                **self.valid,
-                "port": 3333,
-            }).tls_enabled
+    return number
+
+
+def _pool_host(pool: str) -> str:
+    """Normalize host or host:port; dedicated port option always wins."""
+
+    match = _SCHEME_PATTERN.match(pool)
+
+    if match:
+        pool = pool[match.end():]
+
+    pool = pool.removesuffix("/")
+
+    if (
+        not pool
+        or any(c.isspace() for c in pool)
+        or any(c in pool for c in "/@?#\\")
+    ):
+        raise ConfigError(
+            "pool has an invalid address"
         )
 
-    def test_tls_enabled_any_port(self):
-        self.assertTrue(
-            parse_config({
-                **self.valid,
-                "port": 3333,
-                "tls_mode": "enabled",
-            }).tls_enabled
+    if pool.startswith("["):
+        match = re.fullmatch(
+            r"\[([^\]]+)\](?::([0-9]+))?",
+            pool,
+            re.ASCII,
         )
 
-    def test_tls_disabled_any_port(self):
-        self.assertFalse(
-            parse_config({
-                **self.valid,
-                "tls_mode": "disabled",
-            }).tls_enabled
-        )
-
-    def test_invalid_tls_mode(self):
-        with self.assertRaises(ConfigError):
-            parse_config({
-                **self.valid,
-                "tls_mode": "invalid",
-            })
-
-    def test_hostname_with_embedded_port(self):
-        config = parse_config({
-            **self.valid,
-            "pool": "stratum+tcp://pool.example.org:3333",
-        })
-
-        self.assertEqual(
-            config.pool_url,
-            "pool.example.org:443",
-        )
-
-    def test_bracketed_ipv6(self):
-        config = parse_config({
-            **self.valid,
-            "pool": "[2001:db8::1]:3333",
-        })
-
-        self.assertEqual(
-            config.pool_url,
-            "[2001:db8::1]:443",
-        )
-
-    def test_invalid_pool_addresses(self):
-        for invalid in (
-            "",
-            "pool.example.org/path",
-            "pool.example.org@evil",
-            "pool example.org",
-            "2001:db8::1",
-            "[not-ipv6]",
-            "pool.example.org:abc",
-        ):
-            with self.subTest(pool=invalid):
-                with self.assertRaises(ConfigError):
-                    parse_config({
-                        **self.valid,
-                        "pool": invalid,
-                    })
-
-    def test_reject_control_characters(self):
-        with self.assertRaises(ConfigError):
-            parse_config({
-                **self.valid,
-                "worker": "HA\nFake",
-            })
-
-    def test_wallet_not_exposed_in_repr(self):
-        self.assertNotIn(
-            "TEST_WALLET_SECRET",
-            repr(parse_config(self.valid)),
-        )
-
-    def test_invalid_config_error_does_not_expose_wallet(self):
-        with self.assertRaises(ConfigError) as caught:
-            parse_config({
-                **self.valid,
-                "threads": 0,
-            })
-
-        self.assertNotIn(
-            "TEST_WALLET_SECRET",
-            str(caught.exception),
-        )
-
-    def test_additional_keys_are_ignored_for_forward_compatibility(self):
-        self.assertEqual(
-            parse_config({
-                **self.valid,
-                "future_option": "value",
-            }).port,
-            443,
-        )
-
-    def test_load_options_file(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "options.json"
-
-            path.write_text(
-                json.dumps(self.valid),
-                encoding="utf-8",
+        if not match:
+            raise ConfigError(
+                "pool has an invalid bracketed IPv6 address"
             )
 
-            self.assertEqual(
-                load_config(path).worker,
-                "HA",
+        try:
+            ipaddress.IPv6Address(match.group(1))
+        except ValueError as exc:
+            raise ConfigError(
+                "pool has an invalid IPv6 address"
+            ) from exc
+
+        return f"[{match.group(1)}]"
+
+    if pool.count(":") > 1:
+        raise ConfigError(
+            "IPv6 pool addresses require brackets"
+        )
+
+    if ":" in pool:
+        pool, embedded_port = pool.split(":", 1)
+
+        if (
+            not embedded_port
+            or not embedded_port.isascii()
+            or not embedded_port.isdigit()
+        ):
+            raise ConfigError(
+                "pool contains an invalid embedded port"
             )
 
-    def test_corrupt_options_file(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "options.json"
+        _integer(
+            embedded_port,
+            "embedded pool port",
+            1,
+            65535,
+        )
 
-            path.write_text(
-                "{invalid",
-                encoding="utf-8",
+    if not _HOST_PATTERN.fullmatch(pool):
+        raise ConfigError(
+            "pool has an invalid hostname"
+        )
+
+    return pool
+
+
+@dataclass(frozen=True)
+class MinerConfig:
+    pool: str
+    port: int
+    wallet: str = field(repr=False)
+    worker: str = DEFAULT_WORKER
+    threads: int = DEFAULT_THREADS
+    priority: int = DEFAULT_PRIORITY
+    tls_mode: str = DEFAULT_TLS_MODE
+
+    @property
+    def pool_host(self) -> str:
+        return _pool_host(self.pool)
+
+    @property
+    def pool_url(self) -> str:
+        return f"{self.pool_host}:{self.port}"
+
+    @property
+    def tls_enabled(self) -> bool:
+        return (
+            self.tls_mode == "enabled"
+            or (
+                self.tls_mode == "auto"
+                and self.port == 443
             )
-
-            with self.assertRaises(ConfigError):
-                load_config(path)
-
-    def test_missing_options_file(self):
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(ConfigError):
-                load_config(
-                    Path(directory) / "missing.json"
-                )
+        )
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+def parse_config(
+    options: Mapping[str, Any],
+) -> MinerConfig:
+    """Validate an options.json mapping.
 
+    Additional future add-on settings are ignored.
+    """
+
+    if not isinstance(options, Mapping):
+        raise ConfigError(
+            "configuration must be a JSON object"
+        )
+
+    pool = _string(
+        options.get("pool", DEFAULT_POOL),
+        "pool",
+        max_length=255,
+    )
+
+    _pool_host(pool)
+
+    wallet = _string(
+        options.get("wallet", ""),
+        "wallet",
+        max_length=512,
+    )
+
+    worker = _string(
+        options.get("worker", DEFAULT_WORKER),
+        "worker",
+        max_length=64,
+    )
+
+    port = _integer(
+        options.get("port", DEFAULT_PORT),
+        "port",
+        1,
+        65535,
+    )
+
+    threads = _integer(
+        options.get("threads", DEFAULT_THREADS),
+        "threads",
+        1,
+        256,
+    )
+
+    priority = _integer(
+        options.get("priority", DEFAULT_PRIORITY),
+        "priority",
+        0,
+        5,
+    )
+
+    tls_mode = _string(
+        options.get("tls_mode", DEFAULT_TLS_MODE),
+        "tls_mode",
+        max_length=8,
+    )
+
+    if tls_mode not in SUPPORTED_TLS_MODES:
+        raise ConfigError(
+            "tls_mode must be auto, enabled, or disabled"
+        )
+
+    return MinerConfig(
+        pool,
+        port,
+        wallet,
+        worker,
+        threads,
+        priority,
+        tls_mode,
+    )
+
+
+def load_config(
+    path: str | Path = DEFAULT_CONFIG_PATH,
+) -> MinerConfig:
+    """Read add-on options without exposing their values in errors."""
+
+    try:
+        with Path(path).open(
+            "r",
+            encoding="utf-8",
+        ) as stream:
+            options = json.load(stream)
+
+    except (
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+    ) as exc:
+        raise ConfigError(
+            "configuration file cannot be read as valid JSON"
+        ) from exc
+
+    return parse_config(options)
