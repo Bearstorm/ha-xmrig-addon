@@ -568,3 +568,21 @@ jobs:
             - < tests/runtime/test_beta_entrypoint_options.py
 
           echo "PASS: standalone beta addon: first boot, crash guard and actual /data/options.json wiring"
+
+      - name: Verify real SIGTERM reaps beta mock child
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_beta_sigterm.py
+          echo "PASS: OS SIGTERM, mock process reaping and crash guard clean shutdown"
