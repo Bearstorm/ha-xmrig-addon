@@ -83,6 +83,35 @@ class ParserTests(unittest.TestCase):
         self.assertTrue(parse_summary({"hashrate": 3, "results": [], "connection": "x"}).api_available)
 
 
+    def test_millisecond_uptime_connected(self):
+        snap = parse_summary({"connection": {"uptime_ms": 500, "uptime": 0}})
+        self.assertTrue(snap.pool_connected)
+
+    def test_zero_millisecond_uptime_is_unknown(self):
+        snap = parse_summary({"connection": {"uptime_ms": 0, "uptime": 0}})
+        self.assertIsNone(snap.pool_connected)
+
+    def test_millisecond_uptime_takes_precedence(self):
+        snap = parse_summary({"connection": {"uptime_ms": 0, "uptime": 10}})
+        self.assertIsNone(snap.pool_connected)
+
+    def test_invalid_millisecond_uptime_is_unknown(self):
+        snap = parse_summary({"connection": {"uptime_ms": "invalid", "uptime": 10}})
+        self.assertIsNone(snap.pool_connected)
+
+    def test_explicit_connection_state_takes_precedence(self):
+        snap = parse_summary({"connection": {"connected": False, "uptime_ms": 1000}})
+        self.assertFalse(snap.pool_connected)
+
+    def test_old_seconds_only_api_still_supported(self):
+        snap = parse_summary({"connection": {"uptime": 3}})
+        self.assertTrue(snap.pool_connected)
+
+    def test_negative_millisecond_uptime_is_unknown(self):
+        snap = parse_summary({"connection": {"uptime_ms": -1}})
+        self.assertIsNone(snap.pool_connected)
+
+
 class ApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
