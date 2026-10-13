@@ -56,7 +56,7 @@ class FakeManager:
         self.start_calls += 1
         if self.start_exception:
             raise self.start_exception
-        if self.start_result:
+        if self.start_result and self.start_calls > 1:
             self.desired_running = True
             self.pid = 4321
             self.state = MinerState.RUNNING
