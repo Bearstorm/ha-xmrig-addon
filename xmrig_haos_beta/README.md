@@ -15,7 +15,7 @@ The existing `xmrig_haos` Dockerfile, add-on slug and `/run.sh` entrypoint remai
 - This add-on has not yet been verified on a live HAOS Supervisor.
 - No upgrade path or release authorization is implied by adding the folder.
 
-**Test sequence:** read `docs/HAOS_BETA_ACCEPTANCE.md` before installing.
+**Test sequence:** read `docs/BETA_STAGING_HANDOFF.md` and `docs/HAOS_BETA_ACCEPTANCE.md` in the repository before installing. CI attaches a short-lived source ZIP and checksum after all prerequisite tests pass; it does not publish a GHCR beta image.
 Back up the staging environment and verify rollback to the stable image.
 For actual XMRig running, acquire explicit authorization and define limits.
 
@@ -34,3 +34,10 @@ MQTT identities in the beta copy. Update shared code in both locations.
 6. To roll back, turn Mining OFF, stop the beta add-on, uninstall the beta test package, remove its retained MQTT Discovery records if needed, and restore the staging backup if checks fail. The existing stable `xmrig_haos` add-on and data must not be modified.
 
 **Not yet verified:** installing on a real HAOS Supervisor or demonstrating Protection Mode compatibility. GitHub CI builds the package and forbids actual mining; it cannot replace the staging acceptance test.
+
+
+## Release status
+
+- **Source staging candidate:** available in successful `develop-v2` GitHub Actions artifacts.
+- **Public beta release:** blocked until real disposable HAOS Supervisor, Protection Mode ON, live MQTT service and rollback evidence are recorded.
+- **Do not use on production Home Assistant.** A successful Docker build alone is not a supported release.
