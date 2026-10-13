@@ -13,6 +13,7 @@ from typing import Protocol
 
 from .config import ConfigError, load_config
 from .miner_manager import MinerError, MinerManager, MinerState
+from .mining_state import MiningStateStore, StateStoreError
 from .xmrig_monitor import MinerSnapshot, XmrigMonitor
 
 LOG = logging.getLogger("xmrig-controller")
@@ -59,6 +60,7 @@ class Controller:
         monitor: MonitorProtocol | None = None,
         monitor_interval: float = MONITOR_INTERVAL_SECONDS,
         publisher: PublisherProtocol | None = None,
+        state_store: MiningStateStore | None = None,
     ) -> None:
         if poll_interval <= 0 or monitor_interval <= 0:
             raise ValueError("poll intervals must be positive")
@@ -67,6 +69,7 @@ class Controller:
         self._stop_event = stop_event if stop_event is not None else threading.Event()
         self._monitor = monitor
         self._publisher = publisher
+        self._state_store = state_store
         self._monitor_interval = monitor_interval
         self._monitor_stop = threading.Event()
         self._monitor_wake = threading.Event()
@@ -151,9 +154,20 @@ class Controller:
             LOG.warning("MQTT command mailbox failed; mining continues")
             return
         if command == "OFF" and self._manager.desired_running:
+            if self._state_store is not None:
+                try:
+                    self._state_store.save(False)
+                except StateStoreError:
+                    LOG.warning("Unable to persist OFF state; stopping miner anyway")
             self._manager.stop()
             self._update_process(MinerState.STOPPED)
         elif command == "ON" and not self._manager.desired_running:
+            if self._state_store is not None:
+                try:
+                    self._state_store.save(True)
+                except StateStoreError:
+                    LOG.warning("Unable to persist ON state; miner remains stopped")
+                    return
             self._manager.start()
             self._update_process(self._manager.state)
 
@@ -172,7 +186,15 @@ class Controller:
                 )
                 self._monitor_thread.start()
             if not self._stop_event.is_set():
-                self._manager.start()
+                should_start = True
+                if self._state_store is not None:
+                    try:
+                        should_start = self._state_store.load()
+                    except StateStoreError:
+                        LOG.warning("Invalid persisted mining state; starting safely OFF")
+                        should_start = False
+                if should_start:
+                    self._manager.start()
                 self._update_process(self._manager.state)
             while not self._stop_event.is_set():
                 self._apply_mqtt_command()
@@ -222,6 +244,7 @@ def main(
     manager_factory: Callable = MinerManager,
     monitor_factory: Callable = XmrigMonitor,
     publisher_factory: Callable[[], PublisherProtocol | None] | None = None,
+    state_store_factory: Callable[[], MiningStateStore] | None = None,
     install_signals: bool = True,
 ) -> int:
     """Wire production components; monitor failures never block mining."""
@@ -247,7 +270,15 @@ def main(
             publisher = publisher_factory()
         except Exception:
             LOG.warning("MQTT setup failed; mining remains available")
-    controller = Controller(manager, monitor=monitor, publisher=publisher)
+    state_store = None
+    if state_store_factory is not None:
+        try:
+            state_store = state_store_factory()
+        except Exception:
+            LOG.warning("Mining state store unavailable; startup is blocked")
+            return 1
+    controller = Controller(manager, monitor=monitor, publisher=publisher,
+                            state_store=state_store)
     previous_handlers: dict[signal.Signals, object] = {}
     try:
         if install_signals:
@@ -263,4 +294,5 @@ def main(
 if __name__ == "__main__":
     from .mqtt_runtime import load_mqtt_publisher
 
-    raise SystemExit(main(publisher_factory=load_mqtt_publisher))
+    raise SystemExit(main(publisher_factory=load_mqtt_publisher,
+                          state_store_factory=MiningStateStore))
