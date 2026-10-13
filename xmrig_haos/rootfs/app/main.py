@@ -1,9 +1,8 @@
-"""XMRig HAOS Safe process controller.
+"""XMRig HAOS Safe controller with independent read-only HTTP telemetry.
 
-This module does not require MQTT, Supervisor, or access to host processes.
-Until Dockerfile is migrated, the existing run.sh remains the add-on entrypoint.
+The miner lifecycle never depends on MQTT or HTTP monitoring availability.
+The existing run.sh stays the entrypoint until a separately tested migration.
 """
-
 from __future__ import annotations
 
 import logging
@@ -14,31 +13,35 @@ from typing import Protocol
 
 from .config import ConfigError, load_config
 from .miner_manager import MinerError, MinerManager, MinerState
+from .xmrig_monitor import MinerSnapshot, XmrigMonitor
 
 LOG = logging.getLogger("xmrig-controller")
 POLL_INTERVAL_SECONDS = 1.0
+MONITOR_INTERVAL_SECONDS = 5.0
 
 
 class ManagerProtocol(Protocol):
     @property
     def state(self) -> MinerState: ...
-
+    @property
+    def pid(self) -> int | None: ...
     @property
     def last_error(self) -> str | None: ...
-
     @property
     def retry_at(self) -> float | None: ...
-
     @property
     def desired_running(self) -> bool: ...
-
     def start(self) -> bool: ...
     def reconcile(self) -> MinerState: ...
     def shutdown(self, timeout: float = 10.0) -> None: ...
 
 
+class MonitorProtocol(Protocol):
+    def poll(self) -> MinerSnapshot: ...
+
+
 class Controller:
-    """Own the manager and coordinate an orderly process shutdown."""
+    """Supervise one miner and optionally sample its metrics in a worker thread."""
 
     def __init__(
         self,
@@ -46,25 +49,89 @@ class Controller:
         *,
         poll_interval: float = POLL_INTERVAL_SECONDS,
         stop_event: threading.Event | None = None,
+        monitor: MonitorProtocol | None = None,
+        monitor_interval: float = MONITOR_INTERVAL_SECONDS,
     ) -> None:
-        if poll_interval <= 0:
-            raise ValueError("poll_interval must be positive")
+        if poll_interval <= 0 or monitor_interval <= 0:
+            raise ValueError("poll intervals must be positive")
         self._manager = manager
         self._poll_interval = poll_interval
         self._stop_event = stop_event if stop_event is not None else threading.Event()
-        self._shutdown_requested = False
+        self._monitor = monitor
+        self._monitor_interval = monitor_interval
+        self._monitor_stop = threading.Event()
+        self._monitor_wake = threading.Event()
+        self._monitor_thread: threading.Thread | None = None
+        self._snapshot_lock = threading.Lock()
+        self._snapshot = MinerSnapshot(False, error="miner_not_running")
+        self._current_pid: int | None = None
+        self._generation = 0
+
+    @property
+    def snapshot(self) -> MinerSnapshot:
+        with self._snapshot_lock:
+            return self._snapshot
 
     def request_shutdown(self) -> None:
-        self._shutdown_requested = True
         self._stop_event.set()
+        self._monitor_stop.set()
+        self._monitor_wake.set()
+
+    def _update_process(self, state: MinerState) -> None:
+        pid = self._manager.pid if state == MinerState.RUNNING else None
+        with self._snapshot_lock:
+            if pid == self._current_pid:
+                return
+            self._current_pid = pid
+            self._generation += 1
+            self._snapshot = MinerSnapshot(
+                False, error="awaiting_api" if pid is not None else "miner_not_running"
+            )
+        self._monitor_wake.set()
+
+    def _monitor_loop(self) -> None:
+        while not self._monitor_stop.is_set():
+            with self._snapshot_lock:
+                pid = self._current_pid
+                generation = self._generation
+            if pid is None:
+                self._monitor_wake.wait(timeout=0.2)
+                self._monitor_wake.clear()
+                continue
+            try:
+                assert self._monitor is not None
+                sample = self._monitor.poll()
+                if not isinstance(sample, MinerSnapshot):
+                    sample = MinerSnapshot(False, error="invalid_monitor_result")
+            except Exception:
+                # Never disclose HTTP error bodies, credentials, or URLs.
+                LOG.warning("XMRig telemetry polling failed")
+                sample = MinerSnapshot(False, error="monitor_error")
+            with self._snapshot_lock:
+                if (
+                    not self._monitor_stop.is_set()
+                    and self._current_pid == pid
+                    and self._generation == generation
+                ):
+                    self._snapshot = sample
+            self._monitor_wake.wait(timeout=self._monitor_interval)
+            self._monitor_wake.clear()
 
     def run(self) -> int:
         """Run until signalled or retries are exhausted; always reap miner."""
         exit_code = 0
         try:
-            self._manager.start()
+            if self._monitor is not None and not self._stop_event.is_set():
+                self._monitor_thread = threading.Thread(
+                    target=self._monitor_loop, name="xmrig-telemetry", daemon=True
+                )
+                self._monitor_thread.start()
+            if not self._stop_event.is_set():
+                self._manager.start()
+                self._update_process(self._manager.state)
             while not self._stop_event.is_set():
                 state = self._manager.reconcile()
+                self._update_process(state)
                 if (
                     state == MinerState.ERROR
                     and not self._manager.desired_running
@@ -75,15 +142,26 @@ class Controller:
                     break
                 self._stop_event.wait(self._poll_interval)
         except (MinerError, OSError):
-            # Do not log underlying exception data, which can contain credentials.
             LOG.error("XMRig process management failed")
             exit_code = 1
         finally:
+            self._monitor_stop.set()
+            self._monitor_wake.set()
             try:
                 self._manager.shutdown()
             except (MinerError, OSError):
                 LOG.error("XMRig shutdown failed")
                 exit_code = 1
+            self._update_process(MinerState.STOPPED)
+            if self._monitor_thread is not None:
+                # Poll has a 2s timeout in production. A join bound avoids
+                # hanging add-on shutdown if a custom monitor misbehaves.
+                self._monitor_thread.join(timeout=3.0)
+                if self._monitor_thread.is_alive():
+                    LOG.error("Telemetry worker did not stop in time")
+                    exit_code = 1
+            with self._snapshot_lock:
+                self._snapshot = MinerSnapshot(False, error="miner_not_running")
         return exit_code
 
 
@@ -91,17 +169,27 @@ def main(
     *,
     config_loader: Callable = load_config,
     manager_factory: Callable = MinerManager,
+    monitor_factory: Callable = XmrigMonitor,
     install_signals: bool = True,
 ) -> int:
-    """Wire production dependencies while allowing isolated unit testing."""
+    """Wire production components; monitor failures never block mining."""
     logging.basicConfig(level=logging.INFO, format="[xmrig-controller] %(message)s")
     try:
         config = config_loader()
     except (ConfigError, OSError):
         LOG.error("Invalid or unreadable add-on configuration")
         return 1
-
-    controller = Controller(manager_factory(config))
+    try:
+        manager = manager_factory(config)
+    except (ValueError, TypeError, OSError, MinerError):
+        LOG.error("Unable to initialize XMRig process manager")
+        return 1
+    try:
+        monitor = monitor_factory()
+    except (ValueError, TypeError, OSError):
+        LOG.warning("Unable to initialize telemetry; mining remains available")
+        monitor = None
+    controller = Controller(manager, monitor=monitor)
     previous_handlers: dict[signal.Signals, object] = {}
     try:
         if install_signals:
