@@ -226,8 +226,10 @@ jobs:
           files = (
               Path("xmrig_haos/rootfs/app/config.py"),
               Path("xmrig_haos/rootfs/app/miner_manager.py"),
+              Path("xmrig_haos/rootfs/app/main.py"),
               Path("tests/test_config.py"),
               Path("tests/test_miner_manager.py"),
+              Path("tests/test_main.py"),
           )
 
           for path in files:
@@ -274,7 +276,23 @@ jobs:
           echo "PASS: Python Miner Manager unit tests"
 
       # ------------------------------------------
-      # 14. Validation summary
+      # 14. Run Python Main Controller unit tests
+      # ------------------------------------------
+
+      - name: Run Python Main Controller unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python -m unittest discover \
+            -s tests \
+            -p 'test_main.py' \
+            -v
+
+          echo "PASS: Python Main Controller unit tests"
+
+      # ------------------------------------------
+      # 15. Validation summary
       # ------------------------------------------
 
       - name: Validation summary
@@ -289,7 +307,8 @@ jobs:
           echo "Release policy security scenarios: 16"
           echo "Python configuration unit tests: 23"
           echo "Python Miner Manager unit tests: 23"
-          echo "Expected total scenarios: 82"
+          echo "Python Main Controller unit tests: 12"
+          echo "Expected total scenarios: 94"
           echo "======================================"
           echo "All preceding validation steps passed."
           echo "Real mining is not performed."
