@@ -52,7 +52,7 @@ class MqttPublisher:
         import paho.mqtt.client as mqtt
         return mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-            client_id="xmrig-haos-monitor",
+            client_id="xmrig-haos-beta-monitor",
             protocol=mqtt.MQTTv311,
         )
 
