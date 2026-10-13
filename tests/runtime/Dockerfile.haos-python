@@ -8,8 +8,10 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends python3; \
+    apt-get install -y --no-install-recommends python3 python3-venv; \
     python3 -c 'import sys; assert sys.version_info >= (3, 10)'; \
+    python3 -m venv /opt/xmrig-venv; \
+    /opt/xmrig-venv/bin/pip install --no-cache-dir "paho-mqtt==2.1.0"; \
     rm -rf /var/lib/apt/lists/*
 
 COPY xmrig_haos/rootfs/app/ /opt/xmrig/app/
@@ -18,4 +20,4 @@ WORKDIR /opt/xmrig
 ENV PYTHONPATH=/opt/xmrig PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
 # Kept in a separate test-only image. No GHCR publishing.
-ENTRYPOINT ["/usr/bin/python3", "-m", "app.main"]
+ENTRYPOINT ["/opt/xmrig-venv/bin/python", "-m", "app.main"]
