@@ -208,7 +208,50 @@ jobs:
           bash tests/test_release_policy.sh
 
       # ------------------------------------------
-      # 11. Validation summary
+      # 11. Validate Python configuration files
+      # ------------------------------------------
+
+      - name: Check Python configuration syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f xmrig_haos/rootfs/app/config.py
+          test -f tests/test_config.py
+
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          files = (
+              Path("xmrig_haos/rootfs/app/config.py"),
+              Path("tests/test_config.py"),
+          )
+
+          for path in files:
+              source = path.read_text(encoding="utf-8")
+              ast.parse(source, filename=str(path))
+              print(f"PASS: Python syntax: {path}")
+          PY
+
+      # ------------------------------------------
+      # 12. Run Python configuration unit tests
+      # ------------------------------------------
+
+      - name: Run Python configuration unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python -m unittest discover \
+            -s tests \
+            -p 'test_config.py' \
+            -v
+
+          echo "PASS: Python configuration unit tests"
+
+      # ------------------------------------------
+      # 13. Validation summary
       # ------------------------------------------
 
       - name: Validation summary
@@ -221,7 +264,8 @@ jobs:
           echo "======================================"
           echo "HAOS startup functional scenarios: 20"
           echo "Release policy security scenarios: 16"
-          echo "Expected total scenarios: 36"
+          echo "Python configuration unit tests: 23"
+          echo "Expected total scenarios: 59"
           echo "======================================"
           echo "All preceding validation steps passed."
           echo "Real mining is not performed."
