@@ -59,6 +59,10 @@ class DiscoveryPayloads:
         return f"{self.base_topic}/process_availability"
 
     @property
+    def mqtt_availability_topic(self) -> str:
+        return f"{self.base_topic}/mqtt_availability"
+
+    @property
     def command_topic(self) -> str:
         return f"{self.base_topic}/command"
 
@@ -116,6 +120,9 @@ class DiscoveryPayloads:
             "object_id": f"{self.node_id}_mining",
             "command_topic": self.command_topic,
             "state_topic": self.process_availability_topic,
+            "availability_topic": self.mqtt_availability_topic,
+            "payload_available": "online",
+            "payload_not_available": "offline",
             "payload_on": "ON",
             "payload_off": "OFF",
             "state_on": "online",
