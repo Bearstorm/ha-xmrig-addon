@@ -269,5 +269,107 @@ class MonitoringControllerTests(unittest.TestCase):
         self.assertEqual(manager.shutdown_calls, 1)
 
 
+
+class FakePublisher:
+    def __init__(self, *, fail_start=False, fail_publish=False, fail_close=False):
+        self.fail_start = fail_start
+        self.fail_publish = fail_publish
+        self.fail_close = fail_close
+        self.started = 0
+        self.closed = 0
+        self.records = []
+        self.published = threading.Event()
+
+    def start(self):
+        self.started += 1
+        if self.fail_start:
+            raise RuntimeError("broker failed")
+        return True
+
+    def publish(self, snapshot, *, process_running):
+        self.records.append((snapshot, process_running))
+        self.published.set()
+        if self.fail_publish:
+            raise RuntimeError("broker disconnected")
+        return True
+
+    def close(self):
+        self.closed += 1
+        if self.fail_close:
+            raise RuntimeError("broker shutdown failed")
+
+
+class MqttControllerTests(unittest.TestCase):
+    def test_mqtt_is_optional(self):
+        manager = FakeManager()
+        stop = threading.Event()
+        manager.on_reconcile = stop.set
+        self.assertEqual(Controller(manager, stop_event=stop).run(), 0)
+        self.assertEqual(manager.shutdown_calls, 1)
+
+    def test_publishes_snapshot_from_monitor_thread(self):
+        manager = FakeManager()
+        monitor = FakeMonitor()
+        publisher = FakePublisher()
+        controller = Controller(manager, monitor=monitor, publisher=publisher,
+                                poll_interval=0.001, monitor_interval=0.01)
+        def done():
+            if publisher.published.is_set():
+                controller.request_shutdown()
+        manager.on_reconcile = done
+        self.assertEqual(controller.run(), 0)
+        self.assertEqual(publisher.started, 1)
+        self.assertEqual(publisher.closed, 1)
+        self.assertTrue(publisher.records[0][1])
+        self.assertEqual(publisher.records[0][0].hashrate_10s, 123.0)
+
+    def test_publish_exception_does_not_stop_miner(self):
+        manager = FakeManager()
+        publisher = FakePublisher(fail_publish=True)
+        controller = Controller(manager, monitor=FakeMonitor(), publisher=publisher,
+                                poll_interval=0.001, monitor_interval=0.01)
+        manager.on_reconcile = lambda: publisher.published.is_set() and controller.request_shutdown()
+        self.assertEqual(controller.run(), 0)
+        self.assertGreaterEqual(len(publisher.records), 1)
+        self.assertEqual(manager.shutdown_calls, 1)
+
+    def test_start_exception_does_not_stop_miner(self):
+        manager = FakeManager()
+        publisher = FakePublisher(fail_start=True)
+        stop = threading.Event()
+        manager.on_reconcile = stop.set
+        self.assertEqual(Controller(manager, stop_event=stop, publisher=publisher).run(), 0)
+        self.assertEqual(manager.shutdown_calls, 1)
+        self.assertEqual(publisher.closed, 1)
+
+    def test_close_exception_does_not_stop_miner(self):
+        manager = FakeManager()
+        publisher = FakePublisher(fail_close=True)
+        stop = threading.Event()
+        manager.on_reconcile = stop.set
+        self.assertEqual(Controller(manager, stop_event=stop, publisher=publisher).run(), 0)
+        self.assertEqual(manager.shutdown_calls, 1)
+
+    def test_late_api_response_never_published(self):
+        manager = FakeManager(states=[MinerState.RUNNING, MinerState.ERROR])
+        manager.retry_at = 10000.0
+        monitor = FakeMonitor()
+        monitor.block = True
+        publisher = FakePublisher()
+        controller = Controller(manager, monitor=monitor, publisher=publisher,
+                                poll_interval=0.001)
+        calls = [0]
+        def done():
+            calls[0] += 1
+            if calls[0] == 1:
+                monitor.started.wait(0.5)
+            if calls[0] >= 2:
+                monitor.proceed.set()
+                controller.request_shutdown()
+        manager.on_reconcile = done
+        self.assertEqual(controller.run(), 0)
+        self.assertEqual(publisher.records, [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
