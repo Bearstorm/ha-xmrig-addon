@@ -232,6 +232,7 @@ jobs:
               Path("xmrig_haos/rootfs/app/mqtt_service.py"),
               Path("xmrig_haos/rootfs/app/mqtt_client.py"),
               Path("xmrig_haos/rootfs/app/mqtt_runtime.py"),
+              Path("xmrig_haos/rootfs/app/mqtt_commands.py"),
               Path("tests/test_config.py"),
               Path("tests/test_miner_manager.py"),
               Path("tests/test_main.py"),
@@ -240,6 +241,7 @@ jobs:
               Path("tests/test_mqtt_service.py"),
               Path("tests/test_mqtt_client.py"),
               Path("tests/test_mqtt_runtime.py"),
+              Path("tests/test_mqtt_commands.py"),
           )
 
           for path in files:
@@ -374,7 +376,21 @@ jobs:
           echo "PASS: MQTT runtime bootstrap tests"
 
       # ------------------------------------------
-      # 20. Validation summary
+      # 20. Reject unsafe MQTT commands and retained messages
+      # ------------------------------------------
+
+      - name: Run MQTT command mailbox tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests \
+            -p 'test_mqtt_commands.py' \
+            -v
+          echo "PASS: MQTT command mailbox tests"
+
+      # ------------------------------------------
+      # 21. Validation summary
       # ------------------------------------------
 
       - name: Validation summary
@@ -389,13 +405,14 @@ jobs:
           echo "Release policy security scenarios: 16"
           echo "Python configuration unit tests: 23"
           echo "Python Miner Manager unit tests: 28"
-          echo "Python Main Controller unit tests: 26"
+          echo "Python Main Controller unit tests: 28"
           echo "Python HTTP monitoring unit tests: 32"
           echo "MQTT Discovery unit tests: 12"
           echo "MQTT service discovery unit tests: 15"
-          echo "MQTT publisher transport unit tests: 17"
+          echo "MQTT publisher transport unit tests: 19"
           echo "MQTT runtime bootstrap tests: 4"
-          echo "Expected total scenarios: 193"
+          echo "MQTT command mailbox unit tests: 8"
+          echo "Expected total scenarios: 205"
           echo "======================================"
           echo "All preceding validation steps passed."
           echo "Real mining is not performed."
