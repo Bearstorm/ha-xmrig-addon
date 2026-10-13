@@ -112,3 +112,10 @@ Three isolated real mock-child subprocess tests were added to `tests/runtime/tes
 A separate `tests/test_main.py` unit test verifies that the SIGTERM handler requests orderly Controller shutdown and that the prior SIGTERM/SIGINT handlers are restored after `main()` returns. This handler test uses a simulated signal callback, **not an operating-system SIGTERM delivered to a live child process**.
 
 **Before real HAOS beta:** still require an actual SIGTERM integration test with process reaping on a disposable test system. Do not claim this is fully completed based on mocked signal handler tests alone.
+
+
+## Step 45: real operating-system SIGTERM integration (isolated beta image)
+
+`tests/runtime/test_beta_sigterm.py` creates a harmless executable Python mock child in a temporary directory. An independent Controller process runs the actual beta `app.main.main()` with operating-system signal handlers installed and a saved ON preference. The test sends **real SIGTERM to that Controller process**, waits for its clean exit, verifies the mock child PID no longer exists and that the durable crash guard has been removed while ON was preserved for a graceful restart. The CI Docker execution is network-disabled, uses a read-only root filesystem and limited CPU/memory/PIDs, and does **not** launch XMRig or contact a pool.
+
+Scope limitation: this verifies Linux process and signal behavior in a self-contained Docker runner, not Home Assistant Supervisor delivering signals to a real add-on. Staging HAOS Supervisor shutdown/start/rollback is still a release blocker.
