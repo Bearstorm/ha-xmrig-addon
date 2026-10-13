@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "development_branch": "develop-v2",
+  "candidate_slug": "xmrig_haos_beta",
+  "ci_docker_mock_tests": "passed",
+  "haos_supervisor_real_install": "not_tested",
+  "haos_protection_mode_on": "not_tested",
+  "haos_real_mqtt_service": "not_tested",
+  "haos_supervisor_process_cleanup": "not_tested",
+  "haos_beta_rollback": "not_tested",
+  "on_device_cpu_thermal_limits": "not_tested",
+  "base_image_immutable_digest": "not_done",
+  "release_approved": false
+}
