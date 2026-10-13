@@ -112,6 +112,38 @@ class PublisherTests(unittest.TestCase):
         self.client.incoming(b"ON", topic="other/command")
         self.assertIsNone(self.pub.commands.take())
 
+    def test_last_will_tracks_mqtt_not_miner(self):
+        self.pub.start()
+        args, kwargs = self.client.will
+        self.assertEqual(args[0], "xmrig_haos/mqtt_availability")
+        self.assertEqual(args[1], "offline")
+
+    def test_pending_commands_cleared_on_disconnect(self):
+        self.pub.start()
+        self.client.connected()
+        self.client.incoming(b"OFF")
+        self.client.disconnected()
+        self.assertIsNone(self.pub.commands.take())
+
+    def test_reconnect_republishes_cached_actual_miner_state(self):
+        self.pub.start()
+        self.client.connected()
+        self.pub.publish(MinerSnapshot(True), process_running=True)
+        self.client.disconnected()
+        self.client.connected()
+        by_topic = [record for record in self.client.records
+                    if record[0] == "xmrig_haos/process_availability"]
+        self.assertEqual(by_topic[-1][1], "online")
+        self.assertEqual(self.client.records[-1][0], "xmrig_haos/mqtt_availability")
+
+    def test_offline_not_misreported_as_miner_stopped(self):
+        self.pub.start()
+        self.client.connected()
+        self.pub.publish(MinerSnapshot(True), process_running=True)
+        self.client.disconnected()
+        self.assertFalse(self.pub.connected)
+        self.assertTrue(self.pub._last_process_running)
+
     def test_start_connect_async(self):
         self.assertTrue(self.pub.start())
         self.assertEqual(self.client.endpoint, ("core-mosquitto", 1883, 60))
@@ -126,7 +158,7 @@ class PublisherTests(unittest.TestCase):
         self.pub.start()
         self.client.connected()
         self.assertTrue(self.pub.connected)
-        self.assertEqual(len(self.client.records), 9)
+        self.assertEqual(len(self.client.records), 10)
         self.assertTrue(all(m[3] for m in self.client.records))
 
     def test_republish_discovery_on_reconnect(self):
@@ -135,13 +167,13 @@ class PublisherTests(unittest.TestCase):
         self.client.disconnected()
         self.assertFalse(self.pub.connected)
         self.client.connected()
-        self.assertEqual(len(self.client.records), 18)
+        self.assertEqual(len(self.client.records), 20)
 
     def test_telemetry_messages(self):
         self.pub.start()
         self.client.connected()
         self.assertTrue(self.pub.publish(MinerSnapshot(True, hashrate_10s=99), process_running=True))
-        self.assertEqual(len(self.client.records), 12)
+        self.assertEqual(len(self.client.records), 13)
         self.assertIn("99", self.client.records[-1][1])
         self.assertFalse(self.client.records[-1][3])
 
