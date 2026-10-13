@@ -68,3 +68,15 @@ This document does not authorize a merge, release, GHCR push, or installation in
 ## README release update agreement
 
 Keep the existing `README.md` style, language (English), title, badges, two-variant comparison, installation/configuration tables, troubleshooting, roadmap, license and donation section. Immediately before a separately approved release, update the **entire existing README** to match the features actually shipped in the production images. Explain MQTT Discovery, switch behavior, state persistence, Supervisor broker service, limitations, HAOS vs Supervised differences, and safe migration/rollback. Do not present candidate-only Python features as already installed in the published add-on. No new release or README publishing without the final release review.
+
+
+## Documentation review before 2.0 release — platform support wording
+
+- Preserve the original English README structure and visual style while updating terminology.
+- Present **Home Assistant OS (HAOS Safe)** as the primary supported Home Assistant add-on platform.
+- Describe **Home Assistant Supervised / MSR** as a **legacy, officially unsupported Home Assistant installation method**; do not promise continued upstream Home Assistant support.
+- Clarify that **Debian 12 (Bookworm)** used as a Docker image base is not the same as claiming official support for Home Assistant Supervised on Debian 12.
+- Review the Debian base image and dependency compatibility separately before deciding whether to migrate to Debian 13 (Trixie). Never upgrade the base image based solely on its version number.
+- Keep the existing Supervised/MSR implementation for legacy users unless separate compatibility and migration decisions are approved.
+- Review README installation table, badges, supported-platform text, comparison, MSR notes, troubleshooting and compatibility matrix together for consistent wording.
+- Do not describe Python/MQTT candidate functionality as available in a published release until its production artifact is actually approved and shipped.
