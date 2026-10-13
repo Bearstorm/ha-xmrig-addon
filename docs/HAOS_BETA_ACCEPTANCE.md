@@ -65,3 +65,20 @@ The script exercises the real `app.main.main()` wiring, the actual `app.config.l
 - an empty wallet must return a controlled configuration error.
 
 The test uses no real credentials, real mining, real Supervisor token or HAOS installation. **It does not establish actual HAOS Supervisor, Protection Mode, MQTT ACL or resource/thermal compatibility.** On-device staging acceptance and rollback evidence remain mandatory before a beta release.
+
+
+## Step 43 — MQTT disconnect/reconnect race gate (beta only)
+
+The independent beta MQTT transport now rejects `ON/OFF` messages unless the originating client matches the current active client **and** the connection is established. Disconnect callbacks for obsolete clients are ignored; refused connections clear the pending command mailbox for the active client. This reduces the risk of late MQTT network callbacks rearming mining while disconnected.
+
+The standalone eight-test `tests/runtime/test_beta_mqtt_lifecycle.py` suite covers:
+- messages delivered before the connection is established;
+- queued command cleared on disconnect;
+- late ON after disconnect rejected;
+- reconnect drops old/retained ON but accepts fresh OFF;
+- burst ON/OFF uses only the latest requested state;
+- stable namespace commands cannot control the beta;
+- callbacks from a stale client cannot change the active connection state;
+- reconnection republishes cached process status, not old commands.
+
+These are unit-style callback lifecycle tests with a fake client; real Mosquitto tests and the real HAOS Supervisor acceptance remain separate. A real operator ON command received and consumed **before** disconnect may still start mining, because the MQTT broker dropping offline is not a global mining kill switch. Document this behavior clearly when proceeding to live staging.
