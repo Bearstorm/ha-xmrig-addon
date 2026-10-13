@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import signal
+from unittest.mock import patch
 import sys
 import threading
 import tempfile
@@ -166,6 +168,35 @@ class ControllerTests(unittest.TestCase):
         ), 1)
         self.assertIs(received[0], marker)
         self.assertEqual(fake.shutdown_calls, 1)
+
+    def test_sigterm_handler_requests_shutdown_and_is_restored(self):
+        manager = FakeManager()
+        installed = {}
+        old_term = object()
+        old_int = object()
+        previous = {signal.SIGTERM: old_term, signal.SIGINT: old_int}
+
+        def register(signum, callback):
+            installed.setdefault(signum, []).append(callback)
+
+        def invoke_term():
+            installed[signal.SIGTERM][0](signal.SIGTERM, None)
+
+        manager.on_reconcile = invoke_term
+        with patch.object(controller_module.signal, "getsignal",
+                          side_effect=lambda s: previous[s]):
+            with patch.object(controller_module.signal, "signal",
+                              side_effect=register):
+                outcome = controller_module.main(
+                    config_loader=lambda: object(),
+                    manager_factory=lambda unused: manager,
+                    monitor_factory=lambda: None,
+                    install_signals=True,
+                )
+        self.assertEqual(outcome, 0)
+        self.assertEqual(manager.shutdown_calls, 1)
+        self.assertIs(installed[signal.SIGTERM][-1], old_term)
+        self.assertIs(installed[signal.SIGINT][-1], old_int)
 
     def test_no_mqtt_dependency(self):
         source = (APP_DIR / "main.py").read_text(encoding="utf-8")
