@@ -48,6 +48,13 @@ jobs:
             pyyaml
 
       # ------------------------------------------
+      # README release truth contract (no mining or web access).
+      - name: Verify README against shipped addon manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/check_readme.py
+
       # 3. Validate startup scripts
       # ------------------------------------------
 
