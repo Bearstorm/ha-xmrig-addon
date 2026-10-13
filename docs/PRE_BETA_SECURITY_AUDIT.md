@@ -100,3 +100,15 @@ The independent `xmrig_haos_beta/rootfs/app/mining_state.py` now defaults to `OF
 **Unverified:** successful installation and MQTT service access on real HAOS; temperature/resource policy and graceful on-device rollback. These remain beta release blockers.
 
 README remains faithful to the stable published image; beta behavior is documented only as experimental.
+
+
+## Step 44: Controller shutdown/retry lifecycle regression tests
+
+Three isolated real mock-child subprocess tests were added to `tests/runtime/test_runtime_controller.py`:
+- when crash retries are exhausted, the Controller exits nonzero, reaps its mock child and retains the persistent crash guard;
+- if shutdown was requested while ON was queued, the Controller never starts mining or saves ON;
+- after retry exhaustion, an explicit OFF clears the saved preference and crash guard.
+
+A separate `tests/test_main.py` unit test verifies that the SIGTERM handler requests orderly Controller shutdown and that the prior SIGTERM/SIGINT handlers are restored after `main()` returns. This handler test uses a simulated signal callback, **not an operating-system SIGTERM delivered to a live child process**.
+
+**Before real HAOS beta:** still require an actual SIGTERM integration test with process reaping on a disposable test system. Do not claim this is fully completed based on mocked signal handler tests alone.
