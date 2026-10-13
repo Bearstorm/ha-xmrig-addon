@@ -357,7 +357,7 @@ jobs:
             --cap-drop ALL \
             --entrypoint /usr/bin/python3 \
             xmrig-haos-python:local \
-            -c 'import app.config, app.main, app.miner_manager, app.xmrig_monitor, app.mqtt_client, app.mqtt_service, app.mqtt_discovery; print("PASS: Controller and MQTT modules import from HAOS candidate")'
+            -c 'import app.config, app.main, app.miner_manager, app.xmrig_monitor, app.mqtt_client, app.mqtt_service, app.mqtt_discovery, app.mqtt_runtime; print("PASS: Controller and MQTT modules import from HAOS candidate")'
 
           docker run --rm \
             --network none \
