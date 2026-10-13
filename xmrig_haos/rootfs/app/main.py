@@ -153,14 +153,15 @@ class Controller:
         except Exception:
             LOG.warning("MQTT command mailbox failed; mining continues")
             return
-        if command == "OFF" and self._manager.desired_running:
+        if command == "OFF":
             if self._state_store is not None:
                 try:
                     self._state_store.save(False)
                 except StateStoreError:
                     LOG.warning("Unable to persist OFF state; stopping miner anyway")
-            self._manager.stop()
-            self._update_process(MinerState.STOPPED)
+            if self._manager.desired_running:
+                self._manager.stop()
+                self._update_process(MinerState.STOPPED)
         elif command == "ON" and not self._manager.desired_running:
             if self._state_store is not None:
                 try:
@@ -195,6 +196,11 @@ class Controller:
                         should_start = False
                 if should_start:
                     self._manager.start()
+                else:
+                    self._publish_snapshot(
+                        MinerSnapshot(False, error="miner_not_running"),
+                        process_running=False,
+                    )
                 self._update_process(self._manager.state)
             while not self._stop_event.is_set():
                 self._apply_mqtt_command()
