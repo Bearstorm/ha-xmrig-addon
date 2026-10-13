@@ -6,7 +6,7 @@
 
 - The candidate declares `services: [mqtt:want]` so the absence of Mosquitto does not stop mining. The official Supervisor services API supports authenticated `GET /services/mqtt` using the injected `SUPERVISOR_TOKEN`.
 - A service client can use `/services*` with default API privileges. Do **not** add `hassio_api: true`, `homeassistant_api: true`, `hassio_role: admin`, `full_access: true`, host network, host PID, privileged capabilities or extra volumes just for this endpoint.
-- `MQTT_COMMAND_TOPIC=xmrig_haos/command` is **not** an environment feature; this notation documents the topic only. Broker authentication and ACLs are the security boundary. Grant publish access only to trusted controllers and the Home Assistant MQTT integration.
+- `MQTT_COMMAND_TOPIC=xmrig_haos_beta/command` is **not** an environment feature; this notation documents the topic only. Broker authentication and ACLs are the security boundary. Grant publish access only to trusted controllers and the Home Assistant MQTT integration.
 - Do not log `SUPERVISOR_TOKEN`, MQTT password or wallet. Do not expose Supervisor HTTP service outside the add-on network.
 - If Supervisor service is absent, the candidate's optional MQTT adapter is disabled; this must not affect process supervision.
 - Live Supervisor API credential provision, broker ACLs, and Protection Mode operation are **not** proven by GitHub Actions.
@@ -15,12 +15,28 @@
 
 1. Create a Home Assistant backup, preserve the current add-on image/version and settings, and confirm restore procedure. Never test an unapproved candidate on the production HAOS.
 2. Prepare an independent disposable HAOS instance on amd64 with the intended Supervisor version and Protection Mode ON.
-3. Confirm the staging Mosquitto provider has registered the MQTT service and that only authorized identities can publish to `xmrig_haos/command`.
+3. Confirm the staging Mosquitto provider has registered the MQTT service and that only authorized identities can publish to `xmrig_haos_beta/command`.
 4. Build/test the candidate in GitHub Actions: syntax/units, mock-child controller, real local Mosquitto, and candidate OFF smoke test.
 5. Install a separately packaged test candidate on staging HAOS only after explicit approval. Confirm Supervisor status stays healthy; CPU and temperature remain within limits.
 6. With no real mining credentials first, verify starting with saved OFF and with a leftover crash guard never spawns XMRig. Check telemetry state and MQTT unavailability.
 7. With disposable test credentials and an explicitly approved mining test window, confirm ON, OFF, graceful restart ON, persistent OFF, broker drop/reconnect, invalid/retained commands, SIGTERM and bounded crash recovery.
 8. Stop the candidate and restore the existing stable `run.sh` add-on; verify Supervisor health and MQTT retained Discovery cleanup or migration.
+
+## Step 41 — isolated installation and rollback procedure
+
+**Scope:** disposable Home Assistant OS (amd64), local add-on only, separate broker and data. Do not add the beta source to a production HAOS instance.
+
+1. **Backup:** Create a full backup of the disposable HAOS, confirm its restore method, and record Supervisor/core/add-on versions. Preserve the stable `xmrig_haos` manifest, slug, settings, Docker image and `/run.sh` entrypoint unchanged.
+2. **Install source:** Select a reviewed `develop-v2` commit, copy *only* its `xmrig_haos_beta` directory into the staging local add-on directory (typically `/addons/local/xmrig_haos_beta`). Reload the add-on store. Do **not** change the normal GitHub repository URL or install the branch on production.
+3. **Review before start:** Confirm slug `xmrig_haos_beta`, `boot: manual`, `stage: experimental`, `services: [mqtt:want]`, Protection Mode **ON**, host PID/network and full access **OFF**. Check no unexpected shared volume/host device permissions.
+4. **First run without mining:** Supply a *staging-only* nonsecret wallet identifier so the beta configuration validator accepts the options (the default wallet is intentionally blank). Start the beta. The first-ever beta state file is missing, so `MiningStateStore.load()` must default to **OFF**. Observe logs, process status and Supervisor health. This first-boot OFF behavior is covered by an independent Docker test, **not yet confirmed on HAOS**.
+5. **Supervisor MQTT:** With optional staging Mosquitto, verify only `xmrig_haos_beta/#` and `homeassistant/*/xmrig_haos_beta/*/config` Discovery topics are used; no stable `xmrig_haos/command` topic is consumed. Check broker ACLs; **never expose Supervisor or broker credentials in screenshots/logs**.
+6. **Explicit ON test gate:** Do not send `ON` until an approved short test window with appropriate CPU, memory and temperature constraints. Then check ON/OFF, saved OFF after restart, graceful ON restart, unclean-shutdown guard, disconnected broker and retained command rejection. **Do not run this on production HAOS.**
+7. **Rollback:** Send OFF when the beta is running, stop the beta, uninstall its **separate** slug and remove only its beta MQTT retained Discovery records where appropriate; check Supervisor health. Restore the staging backup if required. Stable `xmrig_haos` and its config must remain unchanged throughout.
+
+**Stop conditions:** Supervisor unhealthy; Protection Mode needs disabling; privileged host access requested; unexpectedly launched XMRig during OFF; wrong MQTT namespace; missing safe rollback; excessive CPU temperature or unbounded restarts. Record a failing test and stop; do not silently loosen security settings.
+
+**Evidence:** Save the staging version matrix, time of test, masked Supervisor MQTT response status (no token/secret), observed switch ON/OFF states, process PID changes, relevant redacted logs and screenshots, and proof of rollback. Mark unperformed checks as **not tested**, not passed.
 
 ## Exit criteria
 
