@@ -10,7 +10,7 @@ PKG = "mqtt_publisher_test_pkg"
 module = types.ModuleType(PKG)
 module.__path__ = [str(ROOT)]
 sys.modules[PKG] = module
-for name in ("xmrig_monitor", "mqtt_discovery", "mqtt_service", "mqtt_client"):
+for name in ("xmrig_monitor", "mqtt_discovery", "mqtt_service", "mqtt_commands", "mqtt_client"):
     spec = importlib.util.spec_from_file_location(f"{PKG}.{name}", ROOT / f"{name}.py")
     assert spec is not None and spec.loader is not None
     obj = importlib.util.module_from_spec(spec)
@@ -41,6 +41,8 @@ class FakeClient:
         self.tls = False
         self.will = None
         self.endpoint = None
+        self.subscriptions = []
+        self.on_message = None
 
     def username_pw_set(self, user, password):
         self.login = (user, password)
@@ -72,6 +74,14 @@ class FakeClient:
         self.records.append((topic, payload, qos, retain))
         return FakePublishResult(1 if self.fail_publish else 0)
 
+    def subscribe(self, topic, qos=0):
+        self.subscriptions.append((topic, qos))
+        return (0, 1)
+
+    def incoming(self, payload, *, retain=False, topic="xmrig_haos/command"):
+        msg = types.SimpleNamespace(topic=topic, payload=payload, retain=retain)
+        self.on_message(self, None, msg)
+
     def connected(self, reason=0):
         self.on_connect(self, None, None, reason, None)
 
@@ -86,6 +96,21 @@ class PublisherTests(unittest.TestCase):
             BrokerSettings("core-mosquitto", 1883, "user", "secret"),
             client_factory=lambda: self.client,
         )
+
+    def test_subscribes_command_topic(self):
+        self.pub.start()
+        self.client.connected()
+        self.assertEqual(self.client.subscriptions, [("xmrig_haos/command", 1)])
+
+    def test_strict_command_callback(self):
+        self.pub.start()
+        self.client.connected()
+        self.client.incoming(b"OFF")
+        self.assertEqual(self.pub.commands.take(), "OFF")
+        self.client.incoming(b"ON", retain=True)
+        self.assertIsNone(self.pub.commands.take())
+        self.client.incoming(b"ON", topic="other/command")
+        self.assertIsNone(self.pub.commands.take())
 
     def test_start_connect_async(self):
         self.assertTrue(self.pub.start())
