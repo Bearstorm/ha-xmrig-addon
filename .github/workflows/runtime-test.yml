@@ -460,6 +460,16 @@ jobs:
             -p 'test_mqtt_broker.py' \
             -v
 
+      - name: Test independent beta MQTT against actual loopback Mosquitto
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests/runtime \
+            -p 'test_beta_mqtt_broker.py' \
+            -v
+          echo "PASS: beta topic namespace and MQTT control on real local broker"
+
       - name: Stop disposable MQTT broker
         if: always()
         shell: bash
