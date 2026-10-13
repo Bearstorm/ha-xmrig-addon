@@ -664,3 +664,38 @@ jobs:
             --entrypoint /opt/xmrig-venv/bin/python \
             xmrig-haos-beta:local \
             - < tests/runtime/test_beta_secret_logging.py
+
+
+  beta-staging-source:
+    name: Package beta source for disposable HAOS staging (not a release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    needs:
+      - beta-addon-package
+      - local-mqtt-integration
+      - python-controller-runtime
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Create restricted beta staging source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/package_beta_staging.py
+          cd artifacts
+          sha256sum -c xmrig-haos-beta-staging-source.zip.sha256
+
+      - name: Upload development-only staging source
+        uses: actions/upload-artifact@v4
+        with:
+          name: xmrig-haos-beta-staging-source
+          path: |
+            artifacts/xmrig-haos-beta-staging-source.zip
+            artifacts/xmrig-haos-beta-staging-source.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
