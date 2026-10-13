@@ -29,3 +29,10 @@
 ## Reconciliation with current development status
 
 The published HAOS add-on still runs `/bin/bash /run.sh`. The Python + MQTT functionality exists only in the test candidate Dockerfile. Passing a `--network none` Docker test does not establish compatibility with the real Supervisor.
+
+
+## Step 39: simulated Supervisor API acceptance gate
+
+GitHub Actions now tests the beta module against a **local mock Supervisor HTTP service**, exercising the expected `GET /services/mqtt` contract, `Bearer` authorization, missing/rejected tokens, broker credentials and optional MQTT fallback. It also checks that beta command topics and retained Discovery entity topics do not overlap with the stable HAOS namespace. The simulated service uses a fake token and never connects to a real HAOS or mining pool.
+
+**Evidence boundary:** A mock Supervisor validates client behavior, not Supervisor compatibility or HAOS runtime permissions. A separate staging HAOS install with Protection Mode ON and a real Supervisor-provided MQTT service remains mandatory before release. Production HAOS access is out of scope.
