@@ -58,6 +58,10 @@ class DiscoveryPayloads:
     def process_availability_topic(self) -> str:
         return f"{self.base_topic}/process_availability"
 
+    @property
+    def command_topic(self) -> str:
+        return f"{self.base_topic}/command"
+
     def discovery_messages(self) -> list[MqttMessage]:
         device = {"identifiers": [self.node_id], "name": "XMRig Miner 2.0",
                   "manufacturer": "XMRig", "model": "HAOS Safe"}
@@ -106,6 +110,26 @@ class DiscoveryPayloads:
                 json.dumps(payload, separators=(",", ":"), sort_keys=True),
                 retain=True,
             ))
+        switch_config = {
+            "name": "Mining",
+            "unique_id": f"{self.node_id}_mining",
+            "object_id": f"{self.node_id}_mining",
+            "command_topic": self.command_topic,
+            "state_topic": self.process_availability_topic,
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "state_on": "online",
+            "state_off": "offline",
+            "optimistic": False,
+            "retain": False,
+            "icon": "mdi:pickaxe",
+            "device": device,
+        }
+        messages.append(MqttMessage(
+            f"{self.prefix}/switch/{self.node_id}/mining/config",
+            json.dumps(switch_config, separators=(",", ":"), sort_keys=True),
+            retain=True,
+        ))
         return messages
 
     def telemetry_messages(self, snapshot: MinerSnapshot, *, process_running: bool) -> list[MqttMessage]:
