@@ -200,6 +200,7 @@ def main(
     config_loader: Callable = load_config,
     manager_factory: Callable = MinerManager,
     monitor_factory: Callable = XmrigMonitor,
+    publisher_factory: Callable[[], PublisherProtocol | None] | None = None,
     install_signals: bool = True,
 ) -> int:
     """Wire production components; monitor failures never block mining."""
@@ -219,7 +220,13 @@ def main(
     except (ValueError, TypeError, OSError):
         LOG.warning("Unable to initialize telemetry; mining remains available")
         monitor = None
-    controller = Controller(manager, monitor=monitor)
+    publisher = None
+    if publisher_factory is not None:
+        try:
+            publisher = publisher_factory()
+        except Exception:
+            LOG.warning("MQTT setup failed; mining remains available")
+    controller = Controller(manager, monitor=monitor, publisher=publisher)
     previous_handlers: dict[signal.Signals, object] = {}
     try:
         if install_signals:
@@ -233,4 +240,6 @@ def main(
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from .mqtt_runtime import load_mqtt_publisher
+
+    raise SystemExit(main(publisher_factory=load_mqtt_publisher))
