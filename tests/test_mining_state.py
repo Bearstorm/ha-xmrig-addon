@@ -23,6 +23,32 @@ class StateTests(unittest.TestCase):
         self.path = Path(self.tmp.name) / "xmrig_state.json"
         self.store = module.MiningStateStore(self.path)
 
+    def test_guard_arm_and_disarm(self):
+        self.assertFalse(self.store.guard_exists())
+        self.store.arm()
+        self.assertTrue(self.store.guard_exists())
+        self.assertEqual(stat.S_IMODE(self.store.guard_path.stat().st_mode), 0o600)
+        self.store.disarm()
+        self.assertFalse(self.store.guard_exists())
+
+    def test_corrupt_guard_fails_closed(self):
+        self.store.guard_path.write_text("invalid marker")
+        with self.assertRaises(module.StateStoreError):
+            self.store.guard_exists()
+
+    def test_guard_write_failure_blocks_start(self):
+        with patch.object(module.os, "replace", side_effect=OSError("disk failure")):
+            with self.assertRaises(module.StateStoreError):
+                self.store.arm()
+        self.assertFalse(self.store.guard_exists())
+
+    def test_guard_survives_new_store_instance(self):
+        self.store.save(True)
+        self.store.arm()
+        reloaded = module.MiningStateStore(self.path)
+        self.assertTrue(reloaded.load())
+        self.assertTrue(reloaded.guard_exists())
+
     def test_missing_file_defaults_on(self):
         self.assertTrue(self.store.load())
 
