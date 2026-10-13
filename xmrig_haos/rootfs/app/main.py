@@ -32,6 +32,7 @@ class ManagerProtocol(Protocol):
     @property
     def desired_running(self) -> bool: ...
     def start(self) -> bool: ...
+    def stop(self, timeout: float = 10.0) -> None: ...
     def reconcile(self) -> MinerState: ...
     def shutdown(self, timeout: float = 10.0) -> None: ...
 
@@ -96,6 +97,8 @@ class Controller:
                 False, error="awaiting_api" if pid is not None else "miner_not_running"
             )
         self._monitor_wake.set()
+        if pid is None:
+            self._publish_snapshot(MinerSnapshot(False, error="miner_not_running"), process_running=False)
 
     def _monitor_loop(self) -> None:
         while not self._monitor_stop.is_set():
@@ -137,6 +140,23 @@ class Controller:
         except Exception:
             LOG.warning("Optional MQTT publisher failed; mining continues")
 
+    def _apply_mqtt_command(self) -> None:
+        """Apply one bounded MQTT request only from the Controller thread."""
+        commands = getattr(self._publisher, "commands", None)
+        if commands is None:
+            return
+        try:
+            command = commands.take()
+        except Exception:
+            LOG.warning("MQTT command mailbox failed; mining continues")
+            return
+        if command == "OFF" and self._manager.desired_running:
+            self._manager.stop()
+            self._update_process(MinerState.STOPPED)
+        elif command == "ON" and not self._manager.desired_running:
+            self._manager.start()
+            self._update_process(self._manager.state)
+
     def run(self) -> int:
         """Run until signalled or retries are exhausted; always reap miner."""
         exit_code = 0
@@ -155,6 +175,7 @@ class Controller:
                 self._manager.start()
                 self._update_process(self._manager.state)
             while not self._stop_event.is_set():
+                self._apply_mqtt_command()
                 state = self._manager.reconcile()
                 self._update_process(state)
                 if (
