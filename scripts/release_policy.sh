@@ -42,6 +42,7 @@ GIT_REF="${GIT_REF:-}"
 REF_NAME="${REF_NAME:-}"
 RELEASE_SHA="${RELEASE_SHA:-}"
 MAIN_SHA="${MAIN_SHA:-}"
+DEVELOP_SHA="${DEVELOP_SHA:-}"
 OUTPUT_FILE="${GITHUB_OUTPUT:-}"
 
 [[ -n "$EVENT_NAME" ]] ||
@@ -133,20 +134,26 @@ case "$EVENT_NAME" in
             log "Main commit: $MAIN_SHA"
             log "Release commit: $RELEASE_SHA"
 
-            # Only an exact match with the approved
-            # main branch HEAD is allowed.
+            # Source-only beta pre-releases may target the exact reviewed
+            # develop-v2 HEAD without ever publishing GHCR images.
+            # Stable production image publication remains main-HEAD-only.
+            if [[ "$REF_NAME" == *-beta.* &&
+                  "${RELEASE_SHA,,}" != "${MAIN_SHA,,}" ]]; then
 
-            if [[ "${RELEASE_SHA,,}" != "${MAIN_SHA,,}" ]]; then
-                fail "Release tag does not point to current main HEAD"
-            fi
+                [[ "$DEVELOP_SHA" =~ ^[0-9a-fA-F]{40}$ ]] ||
+                    fail "Missing or invalid develop-v2 commit SHA"
 
-            PUSH_IMAGE=true
-            IMAGE_TAG="$REF_NAME"
+                if [[ "${RELEASE_SHA,,}" != "${DEVELOP_SHA,,}" ]]; then
+                    fail "Beta tag does not point to current develop-v2 HEAD"
+                fi
 
-            if [[ "$REF_NAME" == *-beta.* ]]; then
-                log "Beta release approved"
+                log "Beta source-only tag verified at develop-v2 HEAD; no GHCR image push"
             else
-                log "Stable release approved"
+                [[ "${RELEASE_SHA,,}" == "${MAIN_SHA,,}" ]] ||
+                    fail "Release tag does not point to current main HEAD"
+                PUSH_IMAGE=true
+                IMAGE_TAG="$REF_NAME"
+                log "Main-HEAD release image publication approved"
             fi
 
         # ------------------------------------------
