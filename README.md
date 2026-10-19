@@ -307,6 +307,18 @@ See the [LICENSE](LICENSE) file for details.
 
 ---
 
+## 💝 Free, Non-Commercial Project and Voluntary Donations
+
+This add-on is developed and shared **free of charge as a personal, non-commercial open-source project** under the MIT License. There is **no purchase price, subscription, or mandatory donation** to download, install, use, or update it.
+
+The **Support me** PayPal link below is entirely optional. Contributions are voluntary expressions of appreciation; they are **not a required payment for the software**, do not purchase technical support or a service contract, and do not create any additional warranty. The author makes no promise of paid support, updates, or particular results in exchange for donations.
+
+Users are responsible for deciding whether mining is appropriate for their own hardware, setting safe CPU loads and processor-specific temperature limits, providing adequate cooling, and monitoring their systems. Mining should not exceed the manufacturer's recommended sustained operating conditions.
+
+The software is provided **"AS IS", without warranty of any kind**, under the terms of the MIT License and subject to applicable law. The project author and contributors disclaim liability to the extent permitted by law; no disclaimer excludes liability that cannot legally be excluded.
+
+---
+
 ## Support me 🔥
 - 😄 PayPal one-off donation
 <a href="https://www.paypal.com/donate/?hosted_button_id=PVATF8G5NZ392">
