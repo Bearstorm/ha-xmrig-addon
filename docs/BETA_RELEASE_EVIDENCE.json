@@ -17,8 +17,10 @@
     "mqtt": "MQTT Discovery, ON/OFF, CPU RAM sensors compared with HA Supervisor; beta.2 observed 33.33 percent CPU on 12 logical CPUs at four mining threads; Mining OFF left add-on RAM about 14.69 MiB.",
     "process_cleanup": "Child XMRig ON/OFF cleanup verified through unavailable process metrics and memory release. Unexpected Supervisor add-on/process cleanup on production HAOS was not deliberately tested; failure guard is isolated-CI-tested only.",
     "rollback": "Full HAOS backup and earlier beta source archives preserved. Actual rollback installation remains untested; production HAOS rollback test deferred to avoid disruption.",
-    "thermal": "Sustained live-host CPU thermal acceptance test deliberately deferred at the operator's request. Individual users must set CPU-specific temperature/cooling limits; add-on does not implement automatic hardware thermal shutdown. README and release notes warn explicitly.",
+    "thermal": "Short user-observed HAOS temperature check was performed during beta.2 exercise: CPU temperature observed at 76 C with 58% total load and subsequently 63 C with 27% load after Mining OFF, with the operator's Intel Core i5-12500T. This demonstrates observed cooling response only; it is NOT a long-duration thermal acceptance or validation of safe operating thresholds. Sustained thermal acceptance remains not_tested and is non-blocking for experimental beta. CPU-specific limits are the user's responsibility per README.",
     "digest": "Beta Dockerfile FROM ghcr.io/home-assistant/amd64-base-debian:bookworm@sha256:c6a84eec9596b091494a7ba22836090ad56a98a4f73c7b9a9e7590273fc5c5ce matches official upstream bookworm-2026.08.0 GHCR package listing. Isolated standalone HAOS beta build succeeded in GitHub Actions runtime run 39312739028 on commit 43b1a7eaf6f6aea70841c09e9585cb6b7df7951b. This does not yet prove the same pinned image was installed in the operator's earlier beta.2 deployment.",
-    "failure_injection": "Unclean crash guard exercised in isolated CI only; no forced production crash test."
-  }
+    "failure_injection": "Unclean crash guard exercised in isolated CI only; no forced production crash test.",
+    "release_policy": "Experimental beta release requires passing automated CI, standalone real HAOS installation, Protection Mode, real MQTT service, immutable base image evidence and explicit maintainer approval. Abrupt Supervisor cleanup, actual rollback rehearsal and sustained on-device thermal testing are disclosed non-blocking limitations; no claim is made that they passed."
+  },
+  "haos_short_thermal_observation": "passed"
 }
