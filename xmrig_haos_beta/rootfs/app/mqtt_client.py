@@ -84,6 +84,11 @@ class MqttPublisher:
                     if not self._publish(client, msg):
                         LOG.warning("MQTT Discovery publish was not accepted")
                         break
+                # Delete the retired retained beta Discovery entity after a
+                # successful connection, without touching other MQTT devices.
+                for msg in self._discovery.obsolete_discovery_messages():
+                    if not self._publish(client, msg):
+                        LOG.warning("Obsolete MQTT Discovery cleanup was not accepted")
                 if self._last_process_running is not None:
                     self._publish(client, MqttMessage(
                         self._discovery.process_availability_topic,
