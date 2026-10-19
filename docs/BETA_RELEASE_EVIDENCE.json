@@ -9,7 +9,7 @@
   "haos_supervisor_process_cleanup": "not_tested",
   "haos_beta_rollback": "not_tested",
   "on_device_cpu_thermal_limits": "not_tested",
-  "base_image_immutable_digest": "not_done",
+  "base_image_immutable_digest": "passed",
   "release_approved": false,
   "evidence_notes": {
     "real_install": "HAOS local beta.0 to beta.1 to beta.2 update on 2026-10-19; successful startup and MQTT telemetry.",
@@ -18,7 +18,7 @@
     "process_cleanup": "Miner process ON to OFF verified via unavailable process metrics and freed memory. Supervisor process cleanup after abrupt stop was not independently tested.",
     "rollback": "A full HAOS backup and separate earlier beta source archives were preserved; an actual rollback was not executed.",
     "thermal": "No independent sustained host thermal/CPU limit acceptance test recorded.",
-    "digest": "The release gate's immutable base-image digest evidence has not been recorded.",
+    "digest": "Beta Dockerfile FROM ghcr.io/home-assistant/amd64-base-debian:bookworm@sha256:c6a84eec9596b091494a7ba22836090ad56a98a4f73c7b9a9e7590273fc5c5ce matches official upstream bookworm-2026.08.0 GHCR package listing. Isolated standalone HAOS beta build succeeded in GitHub Actions runtime run 39312739028 on commit 43b1a7eaf6f6aea70841c09e9585cb6b7df7951b. This does not yet prove the same pinned image was installed in the operator's earlier beta.2 deployment.",
     "failure_injection": "Unclean crash guard exercised in isolated CI only; no forced production crash test."
   }
 }
