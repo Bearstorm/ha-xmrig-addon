@@ -159,3 +159,18 @@ For users already on an earlier beta, update the beta add-on through Home Assist
 - **Start on boot is controlled by Home Assistant, not by the MQTT Mining switch.** The beta add-on ships with `boot: manual`.
 - Protection Mode and host isolation must remain intact. Do not grant privileges or weaken Supervisor health to enable MSR.
 - Legacy Home Assistant Supervised/MSR support in this repository does not imply that Supervised remains an officially supported HA installation method.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.  
+See the [LICENSE](../LICENSE) file for details.
+
+---
+
+## Support me 🔥
+- 😄 PayPal one-off donation
+<a href="https://www.paypal.com/donate/?hosted_button_id=PVATF8G5NZ392">
+  <img src="https://raw.githubusercontent.com/andreostrovsky/donate-with-paypal/925c5a9e397363c6f7a477973fdeed485df5fdd9/blue.svg" alt="Donate with PayPal" height="40"/>
+</a>
