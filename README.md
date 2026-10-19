@@ -105,6 +105,14 @@ This repository contains **two maintained installation paths and an experimental
 
 ---
 
+### Install the experimental beta from Home Assistant
+
+To try the **separate Beta Test** add-on, add the GitHub beta repository `https://github.com/Bearstorm/ha-xmrig-addon#develop-v2` via **Settings → Apps → Install app → ⋮ → Repositories**. Only the beta branch contains `xmrig_haos_beta`. This is a custom repository, not an official Home Assistant catalog listing. See the [beta installation and migration guide](xmrig_haos_beta/README.md#install-from-the-github-beta-repository-haos-app-store). **Do not run the local beta and repository beta simultaneously** because their MQTT identities overlap.
+
+[![Add beta repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FBearstorm%2Fha-xmrig-addon%23develop-v2)
+
+---
+
 ## 🧪 XMRig Miner 2.0 Beta.2 — MQTT Mining Control
 
 Beta.2 is a separate **experimental** add-on. Its MQTT **Mining** switch is not the Home Assistant add-on Start/Stop button:
