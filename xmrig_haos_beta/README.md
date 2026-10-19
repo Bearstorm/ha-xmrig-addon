@@ -10,7 +10,7 @@
 [![Runtime tests](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/runtime-test.yml/badge.svg?branch=develop-v2)](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/runtime-test.yml)
 ![CI](https://img.shields.io/badge/Beta%20CI-Tested-green.svg)
 ![License](https://img.shields.io/github/license/Bearstorm/ha-xmrig-addon)
-![Visitors](https://komarev.com/ghpvc/?username=Bearstorm&repo=ha-xmrig-addon&style=flat-square)
+[![Visitors](https://hits.sh/github.com/Bearstorm/ha-xmrig-addon.svg?label=Visitors&style=flat-square)](https://hits.sh/github.com/Bearstorm/ha-xmrig-addon/)
 
 **Badge scope:** these badges describe the separate **experimental beta**. They do not claim a published GitHub pre-release or GHCR beta image. The stable release badge in the [repository README](../README.md) refers to repository tags and should not be interpreted as a beta.2 release.
 
