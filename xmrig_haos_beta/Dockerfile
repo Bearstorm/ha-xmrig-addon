@@ -1,6 +1,8 @@
 # Development-only installable HAOS beta. Independent of the stable HAOS addon.
 # Do not publish to GHCR or deploy to production without separate approval.
-FROM ghcr.io/home-assistant/amd64-base-debian:bookworm
+# Immutable upstream HA amd64 Bookworm manifest, verified against GHCR package listing (bookworm-2026.08.0).
+# Revisit digest explicitly when updating the base image.
+FROM ghcr.io/home-assistant/amd64-base-debian:bookworm@sha256:c6a84eec9596b091494a7ba22836090ad56a98a4f73c7b9a9e7590273fc5c5ce
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ARG XMRIG_VERSION=6.26.0
