@@ -186,6 +186,14 @@ This experimental beta is developed separately from the stable add-on. **Do not 
 
 For users already on an earlier beta, update the beta add-on through Home Assistant after replacing the local-beta source. Do not delete its stored configuration.
 
+## ⚠ CPU Temperature, Cooling and User Responsibility
+
+**You are responsible for determining and configuring appropriate CPU temperature limits for your specific processor, cooling system, enclosure and operating environment.** Consult the processor manufacturer's specifications and your hardware vendor's guidance; do not copy another user's temperature thresholds. A manufacturer's maximum junction temperature is **not** a recommended continuous operating temperature.
+
+**Operating above normal, manufacturer-recommended sustained temperatures is strongly discouraged.** Set conservative warning and mining-shutdown thresholds based on your own hardware, monitor them continuously while mining, and ensure the shutdown mechanism actually works. This add-on does **not** automatically enforce hardware-specific temperature limits or provide built-in thermal shutdown through the MQTT Mining switch; use suitable independent hardware protection and, if desired, tested Home Assistant automations. Do not assume that a Home Assistant automation can replace CPU hardware protections.
+
+**Use at your own risk.** The project author and contributors do not accept responsibility for overheating, equipment damage, instability, data loss or other consequences arising from incorrect configuration, inappropriate temperature limits, inadequate cooling or misuse, **to the extent permitted by applicable law**. This disclaimer does not override mandatory consumer rights or liability that cannot legally be excluded.
+
 ## Limitations and security
 
 - **Experimental pre-release:** not a replacement for the stable HAOS Safe add-on; no guarantee for all hardware, kernels, brokers or HAOS installations.
