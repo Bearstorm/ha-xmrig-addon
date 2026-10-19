@@ -34,8 +34,10 @@ ensure("MQTT Discovery, MQTT Mining switch or persisted Mining ON/OFF" in readme
        "stable feature availability disclaimer missing")
 ensure("no longer an officially supported Home Assistant installation method" in readme,
        "legacy Supervised support warning missing")
-ensure("not yet validated on a real HAOS Supervisor" in readme,
-       "beta validation status missing")
+ensure("beta.2" in readme.lower() and "one real HAOS" in readme,
+       "document real beta.2 HAOS acceptance without implying universal validation")
+ensure("hard-crash" in readme or "unclean" in readme,
+       "describe the remaining untested production failure path")
 ensure("Debian Bookworm (12)" in readme,
        "container base wording missing")
 ensure("Support me 🔥" in readme and "PVATF8G5NZ392" in readme,
