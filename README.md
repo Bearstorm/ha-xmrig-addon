@@ -31,7 +31,7 @@ Configurable **Monero (XMR)** mining add-on for Home Assistant OS on **x86_64 (a
 |-------------|---------------------|
 | Home Assistant OS (HAOS), amd64 | **XMRig Miner (HAOS Safe)** |
 | Existing legacy Home Assistant Supervised deployment | **XMRig Miner (Supervised / MSR)** (unsupported Home Assistant installation method) |
-| Disposable HAOS test environment | **XMRig Miner 2.0 (Beta Test)** (development branch only; not released) |
+| Experienced HAOS beta tester (amd64) | **XMRig Miner 2.0 (Beta Test)** (standalone experimental beta.2 candidate; separate from stable) |
 
 ### How to check your system:
 Go to:
@@ -76,7 +76,7 @@ Settings → System → About
 | Recommended for new Home Assistant installs | ✅ (HAOS) | ❌ |
 | Python MQTT Discovery / Mining switch in stable image | ❌ | ❌ |
 
-The separate **Beta Test** add-on includes Python Controller and MQTT features in development, but has not passed validation on a real HAOS Supervisor.
+The separate **Beta Test** add-on includes a Python Controller, MQTT Discovery, Mining ON/OFF switch and resource telemetry. Version **2.0.0-beta.2** passed isolated CI and live tests on one real HAOS Supervisor. It remains experimental and separate from stable HAOS Safe.
 
 ---
 
@@ -98,8 +98,26 @@ This repository contains **two maintained installation paths and an experimental
 
 ### 🧪 XMRig Miner 2.0 (Beta Test) — Development Only
 - An independently packaged add-on in `xmrig_haos_beta/`, with its own slug and MQTT topic namespace.
-- Includes test-candidate Python Controller, telemetry, MQTT Discovery, ON/OFF and persisted requested state.
-- Builds and passes isolated CI tests; **not yet validated on a real HAOS Supervisor or published as a stable add-on**.
+- Includes Python Controller, miner and container telemetry, MQTT Discovery, a Mining ON/OFF switch, and a persisted requested Mining preference.
+- Beta.2 passed isolated CI and an operator's live HAOS ON/OFF and resource telemetry tests; **still experimental, not a stable release**.
+- The MQTT switch controls **the miner process only**; the lightweight add-on/controller may remain running and publish container sensors while Mining is OFF.
+- A graceful restart may restore the persisted Mining ON preference. An unclean-shutdown guard prevents automatic mining if the guard survives; that crash path was tested in isolation, not by crashing live HAOS.
+
+---
+
+## 🧪 XMRig Miner 2.0 Beta.2 — MQTT Mining Control
+
+Beta.2 is a separate **experimental** add-on. Its MQTT **Mining** switch is not the Home Assistant add-on Start/Stop button:
+
+- **Add-on running + Mining ON:** the controller and XMRig process are running; both miner and container telemetry are available.
+- **Add-on running + Mining OFF:** the controller remains connected to MQTT and publishes lightweight container monitoring, while the miner process is stopped and its metrics are unavailable.
+- **Add-on stopped:** neither the miner nor its MQTT controller is active. A Home Assistant Watchdog can restart the add-on, but does not bypass the controller's unclean-shutdown mining safety guard.
+
+After a **graceful** stop, the remembered Mining ON preference can be restored when the add-on starts again. Following an **unclean crash**, if the persisted startup guard is present, mining remains OFF until a fresh user ON command. The unclean-crash path has only been verified in isolated tests, not by crashing production HAOS.
+
+**MQTT Discovery includes** Mining switch, hashrates (10s/60s/15m), shares, uptime, pool and HTTP API status, XMRig CPU/RAM/peak/thread count/CPU time, and add-on CPU/RAM/network/disk usage. CPU percentages are normalized to the host's online logical CPU count. The deprecated **Add-on RAM usage percent** sensor was removed while **Add-on RAM usage (MiB)** was retained.
+
+See the [full beta.2 README](xmrig_haos_beta/README.md) for the complete entity table, topics, Watchdog explanation, safety behavior, installation and tested limitations.
 
 ---
 
@@ -127,7 +145,7 @@ https://github.com/Bearstorm/ha-xmrig-addon
 4. Set the required wallet and review pool, threads, priority and TLS settings.
 5. Start the add-on and review its logs and CPU temperature.
 
-The **Supervised / MSR** add-on is preserved for existing legacy users only. The **Beta Test** add-on is a development artifact, not distributed as a stable add-on through the normal repository branch. Do not install it on production HAOS.
+The **Supervised / MSR** add-on is preserved for existing legacy users only. The **Beta Test** add-on is separate from the stable repository installation flow and is intended for informed, backed-up testing; it is not recommended as an unattended production miner. Read the [complete beta.2 documentation](xmrig_haos_beta/README.md) before local beta installation.
 
 ---
 
@@ -184,7 +202,8 @@ This installation method is no longer officially supported by Home Assistant. Ho
 ### Experimental Beta
 - Separate add-on slug, manual boot and limited host permissions.
 - MQTT uses the Supervisor-provided optional broker service and a separate `xmrig_haos_beta` namespace.
-- Security assertions are based on source and isolated CI checks; **real HAOS Protection Mode compatibility is not yet verified**.
+- Protection Mode operation and MQTT/CPU/RAM resource metrics were checked on a real HAOS instance in addition to isolated CI. Unexpected hard-crash recovery was tested only in isolation.
+- [Full beta MQTT sensor list, control semantics, Watchdog vs startup guard and observed test results](xmrig_haos_beta/README.md).
 
 ---
 
@@ -218,7 +237,7 @@ Compatibility depends on the actual host/kernel and add-on security configuratio
 | High CPU temperature or HA slowdown | Both variants | Reduce `threads`; inspect cooling and competing workloads |
 | MSR module/permission error | Legacy only | Host/kernel compatibility and legacy privileges; do **not** enable host access on HAOS |
 | No MQTT entities in stable HAOS Safe | Expected | MQTT features are beta-only; the stable image still starts `run.sh` |
-| Experimental beta fails on HAOS | Development only | See `docs/HAOS_BETA_ACCEPTANCE.md`; do not deploy to production |
+| Experimental beta fails on HAOS | Beta only | Stop Mining, check beta logs and rollback; see [beta.2 README](xmrig_haos_beta/README.md) and `docs/HAOS_BETA_ACCEPTANCE.md` |
 
 ---
 
@@ -227,7 +246,7 @@ Compatibility depends on the actual host/kernel and add-on security configuratio
 - AMD64 only; no ARM image is supplied.
 - Stable HAOS Safe has **no MQTT Discovery, MQTT Mining switch or persisted Mining ON/OFF control**.
 - MSR is not available in HAOS Safe; the Supervised/MSR variant is legacy.
-- Experimental beta features are tested in Docker/CI but have not completed real HAOS Supervisor and Protection Mode acceptance tests.
+- Experimental beta.2 telemetry and Mining ON/OFF were validated on one real HAOS Supervisor in addition to isolated CI. Deliberate hard-crash tests on live HAOS were not performed.
 - Actual mining consumes CPU resources and electricity and can raise temperatures.
 
 ---
@@ -236,8 +255,9 @@ Compatibility depends on the actual host/kernel and add-on security configuratio
 
 - [x] Develop Python Controller, MQTT Discovery and Mining switch in an isolated beta candidate
 - [x] Test ON/OFF state persistence, crash guard and MQTT handling in isolated CI
-- [ ] Validate the separate beta add-on on disposable HAOS with real Supervisor MQTT service
-- [ ] Verify rollback, host isolation and broker permissions on real HAOS
+- [x] Validate MQTT Discovery, Mining ON/OFF and resource telemetry on one real HAOS system (beta.2; operator-controlled test)
+- [x] Verify guarded local-beta update and source rollback availability, with stable add-on unchanged
+- [ ] Run dedicated clean-room/disposable HAOS failure-injection acceptance tests before considering stable promotion
 - [ ] Review and approve stable release documentation before promoting any beta functionality
 - [ ] Explore dynamic thread scaling, power reporting and additional architectures only after verification
 
