@@ -498,7 +498,8 @@ jobs:
           test -f xmrig_haos_beta/Dockerfile
           test -f xmrig_haos_beta/rootfs/app/main.py
           test -f xmrig_haos_beta/rootfs/app/mqtt_discovery.py
-          for file in config.py main.py miner_manager.py xmrig_monitor.py mqtt_service.py mqtt_runtime.py; do
+          # Beta main.py intentionally differs to run its isolated resource sampler.
+          for file in config.py miner_manager.py xmrig_monitor.py mqtt_service.py mqtt_runtime.py; do
             cmp "xmrig_haos/rootfs/app/$file" "xmrig_haos_beta/rootfs/app/$file"
           done
           grep -Fq 'client_id="xmrig-haos-beta-monitor"' xmrig_haos_beta/rootfs/app/mqtt_client.py
@@ -506,6 +507,13 @@ jobs:
           grep -Fq 'node_id: str = "xmrig_haos_beta"' xmrig_haos_beta/rootfs/app/mqtt_discovery.py
           grep -Fq 'base_topic: str = "xmrig_haos_beta"' xmrig_haos_beta/rootfs/app/mqtt_discovery.py
           echo "PASS: isolated beta package and shared source consistency"
+
+      - name: Test beta resource sampler and MQTT discovery offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_beta_resource_monitor.py' -v
+          echo "PASS: unprivileged beta resource metrics and availability scopes"
 
       - name: Test beta Supervisor MQTT service contract without HAOS
         shell: bash

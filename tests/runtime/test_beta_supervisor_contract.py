@@ -57,7 +57,7 @@ class BetaIsolationTests(unittest.TestCase):
         self.assertEqual(beta.command_topic, "xmrig_haos_beta/command")
         self.assertEqual(beta.telemetry_topic, "xmrig_haos_beta/telemetry")
         messages = beta.discovery_messages()
-        self.assertEqual(len(messages), 9)
+        self.assertEqual(len(messages), 20)
         self.assertTrue(all("xmrig_haos_beta" in msg.topic for msg in messages))
         self.assertTrue(all("xmrig_haos/" not in msg.topic for msg in messages))
 

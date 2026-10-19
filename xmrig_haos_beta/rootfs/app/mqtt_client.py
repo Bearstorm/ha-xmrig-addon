@@ -14,6 +14,7 @@ from .mqtt_discovery import DiscoveryPayloads, MqttMessage
 from .mqtt_commands import CommandMailbox
 from .mqtt_service import BrokerSettings
 from .xmrig_monitor import MinerSnapshot
+from .resource_monitor import ResourceSnapshot
 
 LOG = logging.getLogger("xmrig-mqtt")
 
@@ -83,6 +84,11 @@ class MqttPublisher:
                     if not self._publish(client, msg):
                         LOG.warning("MQTT Discovery publish was not accepted")
                         break
+                # Delete the retired retained beta Discovery entity after a
+                # successful connection, without touching other MQTT devices.
+                for msg in self._discovery.obsolete_discovery_messages():
+                    if not self._publish(client, msg):
+                        LOG.warning("Obsolete MQTT Discovery cleanup was not accepted")
                 if self._last_process_running is not None:
                     self._publish(client, MqttMessage(
                         self._discovery.process_availability_topic,
@@ -165,6 +171,18 @@ class MqttPublisher:
                 return all(self._publish(self._client, message) for message in messages)
             except (OSError, RuntimeError, ValueError):
                 LOG.warning("MQTT telemetry publishing failed")
+                return False
+
+    def publish_resources(self, snapshot: ResourceSnapshot) -> bool:
+        """Best-effort metrics independent of miner process and HTTP API."""
+        with self._lock:
+            if not self._connected or self._closed or self._client is None:
+                return False
+            try:
+                return all(self._publish(self._client, message)
+                           for message in self._discovery.resource_messages(snapshot))
+            except (OSError, RuntimeError, ValueError):
+                LOG.warning("MQTT resource telemetry publishing failed")
                 return False
 
     def close(self) -> None:

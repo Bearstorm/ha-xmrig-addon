@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .xmrig_monitor import MinerSnapshot
+from .resource_monitor import ResourceSnapshot
 
 
 SENSORS = (
@@ -21,6 +22,22 @@ SENSORS = (
     ("accepted", "Accepted shares", None, "total_increasing", "mdi:check-circle-outline"),
     ("rejected", "Rejected shares", None, "total_increasing", "mdi:close-circle-outline"),
     ("uptime_seconds", "Uptime", "s", "measurement", "mdi:timer-outline"),
+)
+
+# Resource observations are independent of the XMRig HTTP API.
+# Container values remain available when mining is OFF.
+RESOURCE_SENSORS = (
+    ("process_cpu_percent", "XMRig CPU usage", "%", "measurement", "mdi:cpu-64-bit", "process"),
+    ("process_ram_mib", "XMRig RAM usage", "MiB", "measurement", "mdi:memory", "process"),
+    ("process_ram_peak_mib", "XMRig RAM peak", "MiB", "measurement", "mdi:memory", "process"),
+    ("process_threads", "XMRig OS threads", None, "measurement", "mdi:cpu-64-bit", "process"),
+    ("process_cpu_seconds", "XMRig CPU time", "s", "total_increasing", "mdi:timer-outline", "process"),
+    ("container_cpu_percent", "Add-on CPU usage", "%", "measurement", "mdi:cpu-64-bit", "container"),
+    ("container_ram_mib", "Add-on RAM usage", "MiB", "measurement", "mdi:memory", "container"),
+    ("container_net_rx_mib", "Add-on network received", "MiB", "total_increasing", "mdi:download-network", "container"),
+    ("container_net_tx_mib", "Add-on network sent", "MiB", "total_increasing", "mdi:upload-network", "container"),
+    ("container_disk_read_mib", "Add-on disk read", "MiB", "total_increasing", "mdi:harddisk", "container"),
+    ("container_disk_write_mib", "Add-on disk written", "MiB", "total_increasing", "mdi:harddisk", "container"),
 )
 
 
@@ -49,6 +66,10 @@ class DiscoveryPayloads:
     @property
     def telemetry_topic(self) -> str:
         return f"{self.base_topic}/telemetry"
+
+    @property
+    def resources_topic(self) -> str:
+        return f"{self.base_topic}/resources"
 
     @property
     def api_availability_topic(self) -> str:
@@ -114,6 +135,30 @@ class DiscoveryPayloads:
                 json.dumps(payload, separators=(",", ":"), sort_keys=True),
                 retain=True,
             ))
+        for key, label, unit, state_class, icon, scope in RESOURCE_SENSORS:
+            payload = {
+                "name": label,
+                "unique_id": f"{self.node_id}_{key}",
+                "object_id": f"{self.node_id}_{key}",
+                "state_topic": self.resources_topic,
+                "value_template": "{{ value_json." + key + " }}",
+                "availability_topic": (self.process_availability_topic if scope == "process"
+                                       else self.mqtt_availability_topic),
+                "payload_available": "online",
+                "payload_not_available": "offline",
+                "icon": icon,
+                "state_class": state_class,
+                "device": device,
+            }
+            if unit is not None:
+                payload["unit_of_measurement"] = unit
+            if unit == "MiB":
+                payload["device_class"] = "data_size"
+            messages.append(MqttMessage(
+                f"{self.prefix}/sensor/{self.node_id}/{key}/config",
+                json.dumps(payload, separators=(",", ":"), sort_keys=True),
+                retain=True,
+            ))
         switch_config = {
             "name": "Mining",
             "unique_id": f"{self.node_id}_mining",
@@ -139,6 +184,17 @@ class DiscoveryPayloads:
         ))
         return messages
 
+    def obsolete_discovery_messages(self) -> list[MqttMessage]:
+        """Clear only the retired beta RAM-percent Discovery configuration.
+
+        MQTT retained empty payload deletes this precise configuration topic.
+        No other entity, device, or stable addon is affected.
+        """
+        return [MqttMessage(
+            f"{self.prefix}/sensor/{self.node_id}/container_ram_percent/config",
+            "", retain=True, qos=1,
+        )]
+
     def telemetry_messages(self, snapshot: MinerSnapshot, *, process_running: bool) -> list[MqttMessage]:
         if not isinstance(snapshot, MinerSnapshot) or not isinstance(process_running, bool):
             raise ValueError("invalid telemetry input")
@@ -162,3 +218,19 @@ class DiscoveryPayloads:
             MqttMessage(self.telemetry_topic,
                         json.dumps(data, separators=(",", ":"), allow_nan=False), retain=False),
         ]
+
+    def resource_messages(self, snapshot: ResourceSnapshot) -> list[MqttMessage]:
+        """Publish numeric resource fields; unknown metrics are JSON null, not zero."""
+        if not isinstance(snapshot, ResourceSnapshot):
+            raise ValueError("invalid resource telemetry")
+        data: dict[str, Any] = {}
+        for key, *_ in RESOURCE_SENSORS:
+            value = getattr(snapshot, key)
+            if isinstance(value, float) and not math.isfinite(value):
+                value = None
+            data[key] = value
+        return [MqttMessage(
+            self.resources_topic,
+            json.dumps(data, separators=(",", ":"), allow_nan=False),
+            retain=False,
+        )]
