@@ -172,6 +172,26 @@ The pool connection, process ON/OFF, MQTT Discovery, resource sensors and retain
 
 Additional isolated GitHub Actions validation and runtime checks passed for the beta.2 candidate. No deliberate unexpected hard-crash test was performed on production HAOS.
 
+## Install from the GitHub beta repository (HAOS app store)
+
+Home Assistant can install this beta from a **custom app/add-on repository**. It does **not** appear automatically in every user's store, and this branch is not the default stable channel.
+
+**Beta repository URL:** `https://github.com/Bearstorm/ha-xmrig-addon#develop-v2`
+
+[![Add the XMRig beta repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FBearstorm%2Fha-xmrig-addon%23develop-v2)
+
+1. Make a full Home Assistant backup and keep your existing stable add-on unchanged.
+2. In Home Assistant OS, open **Settings → Apps → Install app → ⋮ → Repositories** (older versions may say **Add-ons**).
+3. Add the beta repository URL above, **including `#develop-v2`**. Wait for the repository to load/refresh.
+4. Choose **XMRig Miner 2.0 (Beta Test)**, verify its experimental status, then install it. Check Protection Mode is enabled, configure your pool/wallet and keep Mining OFF initially.
+5. If MQTT is configured, verify the discovered Mining switch and resource sensors before deliberately enabling mining.
+
+**Important:** The GitHub repository installation is not the same Supervisor add-on identity as a local copy in `/addons/local/xmrig_haos_beta`. If you have already installed the local beta, **do not run both copies together**: their MQTT discovery identifiers and `xmrig_haos_beta/*` topics overlap. Back up settings, stop Mining and the local beta, and plan a controlled migration before starting the repository-installed beta. Do not delete or overwrite stable add-ons.
+
+The default GitHub repository URL **without** `#develop-v2` follows the `main` branch and does not currently contain this beta. GitHub Releases alone do not make a new version appear in Home Assistant; the app store reads repository files and the version in `config.yaml`. Users must first add the custom repository; new versions then become available as app updates after the repository refreshes. Updates are **not automatically installed** merely because a GitHub release or commit exists.
+
+For official repository behavior, see [Home Assistant: Create and share a repository](https://contributors.home-assistant.io/apps/guides/repository/).
+
 ## Local installation and rollback
 
 This experimental beta is developed separately from the stable add-on. **Do not overwrite the existing stable `xmrig_haos` folder, image, or configuration.** Its public repository installation flow may differ from manually installing the standalone local-beta folder.
