@@ -1,5 +1,19 @@
 # XMRig Miner 2.0 — Experimental HAOS Beta
 
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
+![Architecture](https://img.shields.io/badge/Arch-amd64-orange.svg)
+![HAOS](https://img.shields.io/badge/HAOS-Tested%20on%20one%20host-green.svg)
+![Beta](https://img.shields.io/badge/Release-2.0.0--beta.2%20candidate-orange.svg)
+![MQTT](https://img.shields.io/badge/MQTT-Discovery%20%2B%20ON%2FOFF-blue.svg)
+![Protection](https://img.shields.io/badge/Protection%20Mode-Compatible-green.svg)
+
+[![Runtime tests](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/runtime-test.yml/badge.svg?branch=develop-v2)](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/runtime-test.yml)
+![CI](https://img.shields.io/badge/Beta%20CI-Tested-green.svg)
+![License](https://img.shields.io/github/license/Bearstorm/ha-xmrig-addon)
+![Visitors](https://komarev.com/ghpvc/?username=Bearstorm&repo=ha-xmrig-addon&style=flat-square)
+
+**Badge scope:** these badges describe the separate **experimental beta**. They do not claim a published GitHub pre-release or GHCR beta image. The stable release badge in the [repository README](../README.md) refers to repository tags and should not be interpreted as a beta.2 release.
+
 **Version 2.0.0-beta.2 — experimental pre-release; CPU, RAM and MQTT functions verified on one real HAOS installation.**
 This is a separate local Home Assistant add-on, not the stable HAOS Safe release.
 The existing `xmrig_haos` Dockerfile, slug, image and `/run.sh` remain unchanged.
