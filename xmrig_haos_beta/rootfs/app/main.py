@@ -15,6 +15,7 @@ from .config import ConfigError, load_config
 from .miner_manager import MinerError, MinerManager, MinerState
 from .mining_state import MiningStateStore, StateStoreError
 from .xmrig_monitor import MinerSnapshot, XmrigMonitor
+from .resource_monitor import ResourceMonitor
 
 LOG = logging.getLogger("xmrig-controller")
 POLL_INTERVAL_SECONDS = 1.0
@@ -61,6 +62,7 @@ class Controller:
         monitor_interval: float = MONITOR_INTERVAL_SECONDS,
         publisher: PublisherProtocol | None = None,
         state_store: MiningStateStore | None = None,
+        resource_monitor: ResourceMonitor | None = None,
     ) -> None:
         if poll_interval <= 0 or monitor_interval <= 0:
             raise ValueError("poll intervals must be positive")
@@ -70,6 +72,8 @@ class Controller:
         self._monitor = monitor
         self._publisher = publisher
         self._state_store = state_store
+        self._resource_monitor = resource_monitor
+        self._resource_thread: threading.Thread | None = None
         self._armed_by_this_session = False
         self._failed_off_persistence = False
         self._monitor_interval = monitor_interval
@@ -137,6 +141,21 @@ class Controller:
             self._monitor_wake.wait(timeout=self._monitor_interval)
             self._monitor_wake.clear()
 
+    def _resources_loop(self) -> None:
+        """Publish cgroup stats even while mining is OFF; fail closed on errors."""
+        while not self._monitor_stop.is_set():
+            try:
+                with self._snapshot_lock:
+                    pid = self._current_pid
+                assert self._resource_monitor is not None
+                sample = self._resource_monitor.poll(pid)
+                publish = getattr(self._publisher, "publish_resources", None)
+                if callable(publish):
+                    publish(sample)
+            except Exception:
+                LOG.warning("Optional resource telemetry failed")
+            self._monitor_stop.wait(self._monitor_interval)
+
     def _publish_snapshot(self, snapshot: MinerSnapshot, *, process_running: bool) -> None:
         if self._publisher is None:
             return
@@ -201,6 +220,12 @@ class Controller:
                     target=self._monitor_loop, name="xmrig-telemetry", daemon=True
                 )
                 self._monitor_thread.start()
+            if (self._resource_monitor is not None and self._publisher is not None
+                    and not self._stop_event.is_set()):
+                self._resource_thread = threading.Thread(
+                    target=self._resources_loop, name="xmrig-resources", daemon=True
+                )
+                self._resource_thread.start()
             if not self._stop_event.is_set():
                 should_start = True
                 if self._state_store is not None:
@@ -249,6 +274,11 @@ class Controller:
                 LOG.error("XMRig shutdown failed")
                 exit_code = 1
             self._update_process(MinerState.STOPPED)
+            if self._resource_thread is not None:
+                self._resource_thread.join(timeout=3.0)
+                if self._resource_thread.is_alive():
+                    LOG.error("Resource worker did not stop in time")
+                    exit_code = 1
             if self._monitor_thread is not None:
                 # Poll has a 2s timeout in production. A join bound avoids
                 # hanging add-on shutdown if a custom monitor misbehaves.
@@ -288,6 +318,7 @@ def main(
     monitor_factory: Callable = XmrigMonitor,
     publisher_factory: Callable[[], PublisherProtocol | None] | None = None,
     state_store_factory: Callable[[], MiningStateStore] | None = None,
+    resource_monitor_factory: Callable[[], ResourceMonitor] | None = None,
     install_signals: bool = True,
 ) -> int:
     """Wire production components; monitor failures never block mining."""
@@ -320,8 +351,14 @@ def main(
         except Exception:
             LOG.warning("Mining state store unavailable; startup is blocked")
             return 1
+    resource_monitor = None
+    if resource_monitor_factory is not None:
+        try:
+            resource_monitor = resource_monitor_factory()
+        except (OSError, ValueError):
+            LOG.warning("Optional resource monitor unavailable")
     controller = Controller(manager, monitor=monitor, publisher=publisher,
-                            state_store=state_store)
+                            state_store=state_store, resource_monitor=resource_monitor)
     previous_handlers: dict[signal.Signals, object] = {}
     try:
         if install_signals:
@@ -338,4 +375,5 @@ if __name__ == "__main__":
     from .mqtt_runtime import load_mqtt_publisher
 
     raise SystemExit(main(publisher_factory=load_mqtt_publisher,
-                          state_store_factory=MiningStateStore))
+                          state_store_factory=MiningStateStore,
+                          resource_monitor_factory=ResourceMonitor))
