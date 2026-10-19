@@ -20,7 +20,7 @@ This beta contains a standalone Python-controlled XMRig mining add-on with Home 
 
 **Live operator HAOS test completed for beta.2:** installed and updated as a separate local beta add-on, 4 mining threads, 12 logical CPUs. Measured Mining ON: add-on CPU **33.33%**, XMRig CPU **33.33%**, add-on memory **2365.46 MiB**, XMRig memory **2352.72 MiB**, 10-second hashrate **1732.22 H/s**, 60-second hashrate **1730.2 H/s**, **3 accepted / 0 rejected** shares. Mining OFF: add-on CPU **0.66%**, RAM **14.69 MiB**, XMRig process sensors unavailable while container sensors remained available. The 15-minute hashrate was not yet available after a ~140-second test.
 
-**Scope limitation:** A deliberate hard-kill / sudden power-loss failure test was **not** run on production HAOS; crash-guard behavior was covered by isolated tests. Results from one HAOS system do not guarantee compatibility with every host, CPU, kernel or broker.
+**Scope limitation:** A deliberate hard-kill / sudden power-loss failure test, an actual rollback installation and a sustained hardware thermal-load acceptance test were **not** run on production HAOS. These live-host tests have been intentionally deferred at the operator's request; crash-guard behavior was covered by isolated tests. Results from one HAOS system do not guarantee compatibility with every host, CPU, kernel or broker.
 
 ## ⚠ CPU Temperature, Cooling and User Responsibility
 
@@ -34,6 +34,6 @@ This beta contains a standalone Python-controlled XMRig mining add-on with Home 
 
 This release is an **experimental standalone beta** (slug `xmrig_haos_beta`). It is **not** a drop-in stable HAOS Safe update. Preserve a full Home Assistant backup and the previous local-beta source before applying beta changes. Use only the `xmrig_haos_beta/` directory with the documented beta installation/update procedure and confirm your wallet/pool settings after an update. Keep the stable add-on separate.
 
-Read the complete [beta README](xmrig_haos_beta/README.md) for **every MQTT entity and topic**, Mining switch explanation, Watchdog/crash guard state handling, safe test procedure, limitations and rollback information. See the [repository README](README.md) for stable-vs-beta differences.
+Read the complete [beta README](https://github.com/Bearstorm/ha-xmrig-addon/blob/develop-v2/xmrig_haos_beta/README.md) for **every MQTT entity and topic**, Mining switch explanation, Watchdog/crash guard state handling, safe test procedure, limitations and rollback information. See the [repository README](https://github.com/Bearstorm/ha-xmrig-addon/blob/develop-v2/README.md) for stable-vs-beta differences.
 
 **Tag requested:** `v2.0.0-beta.2` against reviewed `develop-v2` documentation commit, **GitHub pre-release**, not a stable/latest production release.
