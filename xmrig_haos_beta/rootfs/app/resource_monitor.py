@@ -2,7 +2,7 @@
 
 Only /proc and cgroup v2 are read. No Supervisor API, privileged host access,
 wallet, or additional Python dependency is required. Missing values are None.
-CPU percentages follow conventional Linux top semantics: 100% = one core.
+CPU percentages match HA Supervisor: 100% = all online logical CPUs.
 """
 from __future__ import annotations
 
@@ -24,7 +24,6 @@ class ResourceSnapshot:
     process_cpu_seconds: float | None = None
     container_cpu_percent: float | None = None
     container_ram_mib: float | None = None
-    container_ram_percent: float | None = None
     container_net_rx_mib: float | None = None
     container_net_tx_mib: float | None = None
     container_disk_read_mib: float | None = None
@@ -145,11 +144,16 @@ class ResourceMonitor:
 
     def __init__(self, *, proc: Path = Path("/proc"),
                  cgroup: Path = Path("/sys/fs/cgroup"),
-                 clock=time.monotonic) -> None:
+                 clock=time.monotonic, cpu_count: int | None = None) -> None:
         self._proc = Path(proc)
         self._cgroup = Path(cgroup)
         self._clock = clock
         self._ticks = os.sysconf("SC_CLK_TCK")
+        # Match Supervisor's all-logical-CPU denominator; independent of
+        # configured mining threads, process OS threads and container limits.
+        self._cpu_count = cpu_count if cpu_count is not None else os.cpu_count()
+        if not isinstance(self._cpu_count, int) or isinstance(self._cpu_count, bool) or self._cpu_count <= 0:
+            raise ValueError("online CPU count must be positive")
         self._last_process: tuple[int, int, int, float] | None = None
         self._last_container: tuple[int, float] | None = None
 
@@ -168,7 +172,7 @@ class ResourceMonitor:
                     dt = now - previous[3]
                     delta = ticks - previous[2]
                     if dt > 0 and delta >= 0:
-                        process_cpu = round(100 * delta / self._ticks / dt, 2)
+                        process_cpu = round(100 * delta / self._ticks / dt / self._cpu_count, 2)
                 self._last_process = (pid, start, ticks, now)
             else:
                 self._last_process = None
@@ -186,13 +190,12 @@ class ResourceMonitor:
                 delta = cpu - previous[0]
                 dt = now - previous[1]
                 if delta >= 0 and dt > 0:
-                    container_cpu = round(delta / 1_000_000 / dt * 100, 2)
+                    container_cpu = round(delta / 1_000_000 / dt * 100 / self._cpu_count, 2)
             self._last_container = (cpu, now)
         else:
             self._last_container = None
 
         used = _unsigned((_read_text(self._cgroup / "memory.current") or "").strip())
-        maximum = _unsigned((_read_text(self._cgroup / "memory.max") or "").strip())
         network = _network(self._proc / "net" / "dev")
         disk = _io(self._cgroup / "io.stat")
         return ResourceSnapshot(
@@ -203,7 +206,6 @@ class ResourceMonitor:
             process_cpu_seconds=process_seconds,
             container_cpu_percent=container_cpu,
             container_ram_mib=round(used / MIB, 2) if used is not None else None,
-            container_ram_percent=round(used / maximum * 100, 2) if used is not None and maximum else None,
             container_net_rx_mib=round(network[0] / MIB, 3) if network else None,
             container_net_tx_mib=round(network[1] / MIB, 3) if network else None,
             container_disk_read_mib=round(disk[0] / MIB, 3) if disk else None,
