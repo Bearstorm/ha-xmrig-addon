@@ -3,7 +3,7 @@ slug: xmrig_haos_beta
 description: >-
   Experimental standalone HAOS test addon for Python Controller and MQTT.
   Installs separately; does not replace XMRig Miner (HAOS Safe).
-version: "2.0.0-beta.1"
+version: "2.0.0-beta.2"
 stage: experimental
 url: "https://github.com/Bearstorm/ha-xmrig-addon"
 arch:
