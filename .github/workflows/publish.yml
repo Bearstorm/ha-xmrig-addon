@@ -78,6 +78,7 @@ jobs:
 
           RELEASE_SHA=""
           MAIN_SHA=""
+          DEVELOP_SHA=""
 
           # --------------------------------------
           # Release tag verification
@@ -95,6 +96,13 @@ jobs:
             # Resolve main to its commit.
             MAIN_SHA="$(git rev-parse --verify \
               refs/remotes/origin/main^{commit})"
+
+            # Fetch develop-v2 for source-only beta tag verification.
+            git fetch --no-tags origin \
+              +refs/heads/develop-v2:refs/remotes/origin/develop-v2
+
+            DEVELOP_SHA="$(git rev-parse --verify \
+              refs/remotes/origin/develop-v2^{commit})"
 
             # Resolve the checked-out release commit.
             RELEASE_SHA="$(git rev-parse --verify \
@@ -128,6 +136,7 @@ jobs:
           export REF_NAME
           export RELEASE_SHA
           export MAIN_SHA
+          export DEVELOP_SHA
 
           bash scripts/release_policy.sh
 
