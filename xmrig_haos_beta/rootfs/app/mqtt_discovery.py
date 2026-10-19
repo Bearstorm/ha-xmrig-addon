@@ -34,7 +34,6 @@ RESOURCE_SENSORS = (
     ("process_cpu_seconds", "XMRig CPU time", "s", "total_increasing", "mdi:timer-outline", "process"),
     ("container_cpu_percent", "Add-on CPU usage", "%", "measurement", "mdi:cpu-64-bit", "container"),
     ("container_ram_mib", "Add-on RAM usage", "MiB", "measurement", "mdi:memory", "container"),
-    ("container_ram_percent", "Add-on RAM usage percent", "%", "measurement", "mdi:memory", "container"),
     ("container_net_rx_mib", "Add-on network received", "MiB", "total_increasing", "mdi:download-network", "container"),
     ("container_net_tx_mib", "Add-on network sent", "MiB", "total_increasing", "mdi:upload-network", "container"),
     ("container_disk_read_mib", "Add-on disk read", "MiB", "total_increasing", "mdi:harddisk", "container"),
@@ -184,6 +183,17 @@ class DiscoveryPayloads:
             retain=True,
         ))
         return messages
+
+    def obsolete_discovery_messages(self) -> list[MqttMessage]:
+        """Clear only the retired beta RAM-percent Discovery configuration.
+
+        MQTT retained empty payload deletes this precise configuration topic.
+        No other entity, device, or stable addon is affected.
+        """
+        return [MqttMessage(
+            f"{self.prefix}/sensor/{self.node_id}/container_ram_percent/config",
+            "", retain=True, qos=1,
+        )]
 
     def telemetry_messages(self, snapshot: MinerSnapshot, *, process_running: bool) -> list[MqttMessage]:
         if not isinstance(snapshot, MinerSnapshot) or not isinstance(process_running, bool):
