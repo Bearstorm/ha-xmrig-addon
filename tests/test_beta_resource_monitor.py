@@ -21,7 +21,7 @@ class ResourceTests(unittest.TestCase):
         (self.proc / "net").mkdir()
         self.cg.mkdir()
         self.clock = 100.0
-        self.monitor = ResourceMonitor(proc=self.proc, cgroup=self.cg, clock=lambda: self.clock)
+        self.monitor = ResourceMonitor(proc=self.proc, cgroup=self.cg, clock=lambda: self.clock, cpu_count=12)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -46,7 +46,6 @@ class ResourceTests(unittest.TestCase):
                    "eth0: 1048576 0 0 0 0 0 0 0 2097152 0 0 0 0 0 0 0\n")
         first = self.monitor.poll(None)
         self.assertEqual(first.container_ram_mib, 20.0)
-        self.assertEqual(first.container_ram_percent, 20.0)
         self.assertEqual(first.container_net_rx_mib, 1.0)
         self.assertEqual(first.container_net_tx_mib, 2.0)
         self.assertEqual(first.container_disk_read_mib, 1.0)
@@ -54,7 +53,7 @@ class ResourceTests(unittest.TestCase):
         self.assertIsNone(first.container_cpu_percent)
         self.clock += 5.0
         self.write("cgroup/cpu.stat", "usage_usec 11000000\n")
-        self.assertEqual(self.monitor.poll(None).container_cpu_percent, 200.0)
+        self.assertEqual(self.monitor.poll(None).container_cpu_percent, 16.67)
 
     def test_process_pid_change_resets_cpu_baseline(self):
         # PID 123, comm with parentheses, 20 tokens after the comm field.
@@ -72,6 +71,7 @@ class ResourceTests(unittest.TestCase):
         self.write("proc/123/stat", "123 (xmrig (worker)) " + " ".join(bits) + "\n")
         later = self.monitor.poll(123)
         self.assertGreater(later.process_cpu_percent, 0)
+        self.assertLess(later.process_cpu_percent, 100)
         self.assertIsNone(self.monitor.poll(None).process_cpu_percent)
         self.assertIsNone(self.monitor.poll(123).process_cpu_percent)
 
@@ -79,11 +79,18 @@ class ResourceTests(unittest.TestCase):
         builder = DiscoveryPayloads()
         msgs = builder.discovery_messages()
         by_id = {json.loads(m.payload)["unique_id"]: json.loads(m.payload) for m in msgs}
-        self.assertEqual(len(msgs), 21)
+        self.assertEqual(len(msgs), 20)
         self.assertEqual(by_id["xmrig_haos_beta_process_cpu_percent"]["availability_topic"],
                          builder.process_availability_topic)
         self.assertEqual(by_id["xmrig_haos_beta_container_cpu_percent"]["availability_topic"],
                          builder.mqtt_availability_topic)
+        obsolete = builder.obsolete_discovery_messages()
+        self.assertEqual(len(obsolete), 1)
+        self.assertEqual(obsolete[0].topic,
+                         "homeassistant/sensor/xmrig_haos_beta/container_ram_percent/config")
+        self.assertTrue(obsolete[0].retain)
+        self.assertEqual(obsolete[0].payload, "")
+        self.assertNotIn("xmrig_haos_beta_container_ram_percent", by_id)
         resource = builder.resource_messages(ResourceSnapshot(container_ram_mib=20.0))[0]
         self.assertFalse(resource.retain)
         data = json.loads(resource.payload)
