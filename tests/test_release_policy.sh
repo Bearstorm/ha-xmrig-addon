@@ -62,6 +62,7 @@ run_policy() {
     REF_NAME="$ref_name" \
     RELEASE_SHA="$release_sha" \
     MAIN_SHA="$main_sha" \
+    DEVELOP_SHA="$OTHER_SHA" \
     GITHUB_OUTPUT="$RESULT_FILE" \
         bash "$POLICY_SCRIPT" > "$OUTPUT_FILE" 2>&1
 }
@@ -284,6 +285,22 @@ expect_rejected \
     "refs/tags/v2.0.0" \
     "v2.0.0" \
     ""
+
+# TEST 17 - Source-only beta from exact develop-v2 HEAD
+expect_build_only \
+    "Beta v2.0.0-beta.2 at develop-v2 is source-only" \
+    "push" \
+    "refs/tags/v2.0.0-beta.2" \
+    "v2.0.0-beta.2" \
+    "$OTHER_SHA"
+
+# TEST 18 - Beta tag outside both trusted branch heads
+expect_rejected \
+    "Beta tag outside main and develop-v2 heads rejected" \
+    "push" \
+    "refs/tags/v2.0.0-beta.2" \
+    "v2.0.0-beta.2" \
+    "cccccccccccccccccccccccccccccccccccccccc"
 
 # --------------------------------------------------
 # 4. Final summary
