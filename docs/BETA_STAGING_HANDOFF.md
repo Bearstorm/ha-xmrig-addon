@@ -1,8 +1,10 @@
 # XMRig Miner 2.0 — Beta staging handoff
 
 > **Status: PRE-RELEASE CANDIDATE, NOT PUBLISHED.**
-> Complete the real HAOS checks before creating a beta tag, uploading GHCR images,
-> or presenting this as a supported Home Assistant add-on.
+> Real HAOS beta.2 checks have been recorded for one operator host; see
+> `docs/BETA_RELEASE_EVIDENCE.json` and `docs/RELEASE_NOTES_v2.0.0-beta.2.md`.
+> Do not create a public pre-release without explicit maintainer approval.
+> This source-only beta is not a supported stable add-on or a GHCR image release.
 
 ## CI evidence
 
@@ -46,22 +48,39 @@ and not a public release. Verify the SHA-256 before extracting.
    Supervisor health. Restore staging backup if anything fails. The stable
    `xmrig_haos` add-on and MQTT identities must never be modified.
 
-## Record acceptance
+## Recorded beta.2 acceptance evidence (2026-10-19)
 
-| Gate | Evidence to record | Initial state |
+The table below summarizes recorded results, not new tests performed by this
+handoff document. The machine-readable record in
+`docs/BETA_RELEASE_EVIDENCE.json` is authoritative for release-gate values;
+`docs/RELEASE_NOTES_v2.0.0-beta.2.md` explains the observed measurements and
+scope. Results apply to the operator's one HAOS installation, not all hardware.
+
+| Gate | Recorded state | Scope / limitation |
 |---|---|---|
-| HAOS Supervisor real install | version + redacted screenshot | NOT TESTED |
-| Protection Mode ON | add-on security screenshot | NOT TESTED |
-| Supervisor-provided MQTT | broker test + redacted log | NOT TESTED |
-| Supervisor shutdown/reap | PID and exit result | NOT TESTED |
-| Beta-only rollback | backup/restore and MQTT cleanup | NOT TESTED |
-| CPU/thermal/memory | time-limited test measurements | NOT TESTED |
-| Immutable image dependencies | approved digest/hash review | NOT DONE |
+| CI and isolated Docker/mock tests | PASSED | CI records; not a substitute for real HAOS |
+| HAOS Supervisor real install and beta.0 → beta.1 → beta.2 updates | PASSED | Local standalone beta add-on on one HAOS host |
+| Protection Mode ON | PASSED | No privilege escalation introduced |
+| Real Supervisor-provided MQTT service | PASSED | Discovery, Mining ON/OFF and resource telemetry observed |
+| Supervisor unexpected process cleanup | NOT TESTED | Isolated failure-injection coverage only; deliberate production crash deferred |
+| Beta-only rollback installation | NOT TESTED | Backups/source archives retained; actual rollback deferred |
+| Sustained on-device CPU/thermal limits | NOT TESTED | Short observation only: 76 °C at 58% load, then 63 °C at 27% after Mining OFF; not sustained acceptance |
+| Immutable base image digest | PASSED | Reviewed pinned digest and isolated CI build; does not establish identity of an earlier operator-installed image |
 
-See `docs/BETA_RELEASE_EVIDENCE.json` for the machine-readable gate state.
-**Never mark a gate passed from a mock API or a Docker-only test.** After
-actual results are documented, independently review them before public beta
-release.
+Additional recorded beta.2 measurements: four mining threads on a host with
+12 logical CPUs produced approximately 33.33% normalized CPU use; after
+Mining OFF the add-on RAM was approximately 14.69 MiB. These observations are
+not guarantees for other hosts or configurations.
+
+**Release decision:** `release_approved: false` at the time of this record.
+An experimental source-only pre-release requires separate explicit maintainer
+approval. Do not merge into `main`, push GHCR images or change the stable
+`xmrig_haos` add-on as part of this documentation alignment.
+
+**Never mark a gate passed from a mock API or a Docker-only test.** The deferred
+production crash, rollback and sustained thermal tests are disclosed,
+non-blocking limitations for this experimental beta under the recorded policy;
+do not silently relabel them as passed.
 
 ## README and release discipline
 
