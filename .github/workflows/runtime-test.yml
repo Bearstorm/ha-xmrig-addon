@@ -1,0 +1,709 @@
+
+name: XMRig HAOS - Isolated Runtime Test
+
+on:
+  push:
+    branches:
+      - develop-v2
+    paths:
+      - ".github/workflows/runtime-test.yml"
+      - "xmrig_haos/**"
+      - "xmrig_haos_beta/**"
+      - "tests/runtime/**"
+
+  pull_request:
+    branches:
+      - main
+      - develop-v2
+    paths:
+      - ".github/workflows/runtime-test.yml"
+      - "xmrig_haos/**"
+      - "xmrig_haos_beta/**"
+      - "tests/runtime/**"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-test:
+    name: Test XMRig binary without mining
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+      # ------------------------------------------
+      # 1. Checkout source code
+      # ------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # ------------------------------------------
+      # 2. Prepare Docker Buildx
+      # ------------------------------------------
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # ------------------------------------------
+      # 3. Build HAOS image locally
+      # ------------------------------------------
+
+      - name: Build HAOS Safe runtime image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./xmrig_haos
+          load: true
+          push: false
+          tags: xmrig-haos-runtime-test:local
+
+      # ------------------------------------------
+      # 4. Inspect locally built image
+      # ------------------------------------------
+
+      - name: Inspect Docker image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker image inspect \
+            xmrig-haos-runtime-test:local \
+            --format \
+            'Image ID: {{.Id}}'
+
+          docker image inspect \
+            xmrig-haos-runtime-test:local \
+            --format \
+            'Architecture: {{.Architecture}}'
+
+      # ------------------------------------------
+      # 5. Verify XMRig version
+      # ------------------------------------------
+
+      - name: Verify actual XMRig version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /usr/bin/xmrig \
+            xmrig-haos-runtime-test:local \
+            --version 2>&1 | tee xmrig-version.txt
+
+          grep -Fq "6.26.0" xmrig-version.txt
+
+          echo "PASS: XMRig 6.26.0 version verified"
+
+      # ------------------------------------------
+      # 6. Verify supported CLI options
+      # ------------------------------------------
+
+      - name: Verify supported command-line options
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /usr/bin/xmrig \
+            xmrig-haos-runtime-test:local \
+            --help > xmrig-help.txt 2>&1
+
+          for option in \
+            "--url" \
+            "--user" \
+            "--pass" \
+            "--threads" \
+            "--cpu-priority" \
+            "--randomx-wrmsr" \
+            "--randomx-no-rdmsr" \
+            "--no-huge-pages" \
+            "--keepalive" \
+            "--randomx-mode" \
+            "--tls" \
+            "--http-host" \
+            "--http-port"
+          do
+            if grep -Fq -- "$option" xmrig-help.txt; then
+              echo "PASS: $option"
+            else
+              echo "FAIL: Missing option $option"
+              exit 1
+            fi
+          done
+
+      # ------------------------------------------
+      # 7. Verify container entrypoint
+      # ------------------------------------------
+
+      - name: Verify container entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ENTRYPOINT=$(docker image inspect \
+            xmrig-haos-runtime-test:local \
+            --format '{{json .Config.Entrypoint}}')
+
+          echo "Entrypoint: $ENTRYPOINT"
+
+          test "$ENTRYPOINT" = '["/bin/bash","/run.sh"]'
+
+          echo "PASS: Container entrypoint verified"
+
+      # ------------------------------------------
+      # 8. Verify runtime dependencies
+      # ------------------------------------------
+
+      - name: Verify runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /bin/bash \
+            xmrig-haos-runtime-test:local \
+            -c '
+              set -e
+              command -v jq
+              command -v xmrig
+              test -x /run.sh
+              bash -n /run.sh
+              echo "PASS: Runtime dependencies"
+            '
+
+      # ------------------------------------------
+      # 9. Final summary
+      # ------------------------------------------
+
+      - name: Runtime test summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "XMRig HAOS isolated runtime test"
+          echo "======================================"
+          echo "XMRig version: 6.26.0"
+          echo "Network: disabled during runtime"
+          echo "Mining: not started"
+          echo "GHCR publishing: disabled"
+          echo "Real Home Assistant: not affected"
+          echo "======================================"
+          echo "All isolated runtime checks passed."
+
+  python-controller-runtime:
+    name: Test Python Controller in isolated Docker
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+      # ------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # ------------------------------------------
+      # 2. Prepare Docker Buildx
+      # ------------------------------------------
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # ------------------------------------------
+      # 3. Verify test source files
+      # ------------------------------------------
+
+      - name: Verify Python runtime test sources
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f tests/runtime/Dockerfile
+          test -f tests/runtime/test_runtime_controller.py
+
+          test -f xmrig_haos/rootfs/app/config.py
+          test -f xmrig_haos/rootfs/app/miner_manager.py
+          test -f xmrig_haos/rootfs/app/main.py
+          test -f xmrig_haos/rootfs/app/xmrig_monitor.py
+
+          echo "PASS: Runtime test sources exist"
+
+      # ------------------------------------------
+      # 4. Build isolated Python test image
+      # ------------------------------------------
+
+      - name: Build Python Controller test image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./tests/runtime/Dockerfile
+          load: true
+          push: false
+          tags: xmrig-python-controller-test:local
+
+      # ------------------------------------------
+      # 5. Run isolated integration tests
+      # ------------------------------------------
+
+      - name: Run Python Controller Docker runtime tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            xmrig-python-controller-test:local
+
+          echo "PASS: Python Controller Docker runtime tests"
+
+      # ------------------------------------------
+      # 6. Final summary
+      # ------------------------------------------
+
+      - name: Python Controller runtime summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "XMRig Python Controller runtime tests"
+          echo "======================================"
+          echo "Test image: isolated Python 3.12"
+          echo "Network: disabled"
+          echo "Filesystem: read-only except /tmp"
+          echo "Mining: simulated subprocess only"
+          echo "MQTT: not required"
+          echo "GHCR publishing: disabled"
+          echo "Production HAOS: not affected"
+          echo "======================================"
+          echo "All Python Controller runtime checks passed."
+
+  haos-python-candidate:
+    name: Build candidate HAOS Python image without mining
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Build unchanged HAOS base locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --tag xmrig-haos-legacy:local ./xmrig_haos
+
+      - name: Build Python candidate locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull=false \
+            --file tests/runtime/Dockerfile.haos-python \
+            --tag xmrig-haos-python:local .
+
+      - name: Check Python candidate without starting mining
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENTRYPOINT="$(docker image inspect xmrig-haos-python:local --format '{{json .Config.Entrypoint}}')"
+          test "$ENTRYPOINT" = '["/opt/xmrig-venv/bin/python","-m","app.main"]'
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /usr/bin/python3 \
+            xmrig-haos-python:local \
+            -c 'import app.config, app.main, app.miner_manager, app.xmrig_monitor, app.mqtt_client, app.mqtt_service, app.mqtt_discovery, app.mqtt_runtime; print("PASS: Controller and MQTT modules import from HAOS candidate")'
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /usr/bin/xmrig \
+            xmrig-haos-python:local --version
+
+          docker run --rm \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-python:local \
+            -c 'import paho.mqtt.client as mqtt; assert mqtt.CallbackAPIVersion.VERSION2; print("PASS: MQTT dependency available in candidate")'
+
+          echo "PASS: HAOS Python candidate builds and imports; no mining started"
+
+      - name: Smoke-test candidate OFF and crash guard without mining
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-python:local \
+            - < tests/runtime/test_haos_candidate_smoke.py
+
+          echo "PASS: Candidate OFF/restart smoke without mining"
+
+  local-mqtt-integration:
+    name: Test MQTT against isolated loopback Mosquitto
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install local MQTT test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y mosquitto
+          python -m pip install --disable-pip-version-check "paho-mqtt==2.1.0"
+
+      - name: Start loopback-only disposable Mosquitto broker
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/xmrig-test-mosquitto.conf <<'EOF'
+          listener 18883 127.0.0.1
+          allow_anonymous true
+          persistence false
+          log_dest stdout
+          EOF
+          mosquitto -c /tmp/xmrig-test-mosquitto.conf > /tmp/xmrig-test-mqtt.log 2>&1 &
+          echo "$!" > /tmp/xmrig-test-mqtt.pid
+          python - <<'PY'
+          import socket
+          import time
+          for attempt in range(60):
+              try:
+                  with socket.create_connection(("127.0.0.1", 18883), timeout=0.5):
+                      print("PASS: isolated loopback MQTT broker listening")
+                      break
+              except OSError:
+                  time.sleep(0.1)
+          else:
+              raise RuntimeError("local test broker did not start")
+          PY
+
+      - name: Run real-broker MQTT integration tests without mining
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests/runtime \
+            -p 'test_mqtt_broker.py' \
+            -v
+
+      - name: Test independent beta MQTT against actual loopback Mosquitto
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests/runtime \
+            -p 'test_beta_mqtt_broker.py' \
+            -v
+          echo "PASS: beta topic namespace and MQTT control on real local broker"
+
+      - name: Stop disposable MQTT broker
+        if: always()
+        shell: bash
+        run: |
+          if test -f /tmp/xmrig-test-mqtt.pid; then
+            kill "$(cat /tmp/xmrig-test-mqtt.pid)" || true
+          fi
+
+  beta-addon-package:
+    name: Build installable standalone HAOS beta addon safely
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Verify beta package independent of stable addon
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f xmrig_haos_beta/config.yaml
+          test -f xmrig_haos_beta/Dockerfile
+          test -f xmrig_haos_beta/rootfs/app/main.py
+          test -f xmrig_haos_beta/rootfs/app/mqtt_discovery.py
+          # Beta main.py intentionally differs to run its isolated resource sampler.
+          for file in config.py miner_manager.py xmrig_monitor.py mqtt_service.py mqtt_runtime.py; do
+            cmp "xmrig_haos/rootfs/app/$file" "xmrig_haos_beta/rootfs/app/$file"
+          done
+          grep -Fq 'client_id="xmrig-haos-beta-monitor"' xmrig_haos_beta/rootfs/app/mqtt_client.py
+          grep -Fq 'xmrig_haos_beta/command' xmrig_haos_beta/rootfs/app/mqtt_commands.py
+          grep -Fq 'node_id: str = "xmrig_haos_beta"' xmrig_haos_beta/rootfs/app/mqtt_discovery.py
+          grep -Fq 'base_topic: str = "xmrig_haos_beta"' xmrig_haos_beta/rootfs/app/mqtt_discovery.py
+          echo "PASS: isolated beta package and shared source consistency"
+
+      - name: Test beta resource sampler and MQTT discovery offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_beta_resource_monitor.py' -v
+          echo "PASS: unprivileged beta resource metrics and availability scopes"
+
+      - name: Test beta Supervisor MQTT service contract without HAOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests/runtime \
+            -p 'test_beta_supervisor_contract.py' \
+            -v
+          echo "PASS: Supervisor service contract with simulated bearer-token API"
+
+      - name: Test beta MQTT reconnect and command race safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests/runtime \
+            -p 'test_beta_mqtt_lifecycle.py' \
+            -v
+          echo "PASS: beta MQTT session races and retained commands"
+
+      - name: Build beta add-on directly from its HAOS directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --tag xmrig-haos-beta:local ./xmrig_haos_beta
+
+      - name: Validate beta entrypoint and independent startup without mining
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect xmrig-haos-beta:local --format '{{json .Config.Entrypoint}}')" = '["/opt/xmrig-venv/bin/python","-m","app.main"]'
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_haos_candidate_smoke.py
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_beta_first_boot.py
+
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --tmpfs /data:rw,nosuid,nodev,size=4m,mode=0700 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_beta_entrypoint_options.py
+
+          echo "PASS: standalone beta addon: first boot, crash guard and actual /data/options.json wiring"
+
+      - name: Verify real SIGTERM reaps beta mock child
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_beta_sigterm.py
+          echo "PASS: OS SIGTERM, mock process reaping and crash guard clean shutdown"
+
+      - name: Verify hard crash blocks auto restart
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_beta_hard_crash.py
+
+      - name: Verify corrupted beta state fails closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_beta_state_recovery.py
+
+      - name: Step 48 - fail closed on missing or inaccessible beta data
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_beta_storage_failures.py
+
+      - name: Step 50 - verify credentials never appear in beta error logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --network none \
+            --cpus 1 \
+            --memory 512m \
+            --pids-limit 64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=32m,mode=1777 \
+            --security-opt no-new-privileges \
+            --cap-drop ALL \
+            --entrypoint /opt/xmrig-venv/bin/python \
+            xmrig-haos-beta:local \
+            - < tests/runtime/test_beta_secret_logging.py
+
+
+  beta-staging-source:
+    name: Package beta source for disposable HAOS staging (not a release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    needs:
+      - beta-addon-package
+      - local-mqtt-integration
+      - python-controller-runtime
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Create restricted beta staging source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/package_beta_staging.py
+          cd artifacts
+          sha256sum -c xmrig-haos-beta-staging-source.zip.sha256
+
+      - name: Upload development-only staging source
+        uses: actions/upload-artifact@v4
+        with:
+          name: xmrig-haos-beta-staging-source
+          path: |
+            artifacts/xmrig-haos-beta-staging-source.zip
+            artifacts/xmrig-haos-beta-staging-source.zip.sha256
+          if-no-files-found: error
+          retention-days: 7

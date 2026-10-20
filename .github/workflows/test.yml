@@ -1,0 +1,460 @@
+
+name: XMRig Addon - Validation Tests
+
+on:
+  push:
+    branches:
+      - develop-v2
+
+  pull_request:
+    branches:
+      - main
+      - develop-v2
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate addon source files
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------
+      # 1. Checkout repository
+      # ------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # ------------------------------------------
+      # 2. Install validation dependencies
+      # ------------------------------------------
+
+      - name: Install validation dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+          python -m pip install \
+            --disable-pip-version-check \
+            pyyaml
+
+      # ------------------------------------------
+      # README release truth contract (no mining or web access).
+      - name: Verify README against shipped addon manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/check_readme.py
+          python scripts/check_beta_security.py
+          python scripts/check_beta_supply_chain.py
+          python scripts/check_beta_release_gate.py
+
+      # 3. Validate startup scripts
+      # ------------------------------------------
+
+      - name: Check HAOS startup script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash -n xmrig_haos/rootfs/run.sh
+          echo "PASS: HAOS startup script syntax"
+
+      - name: Check legacy startup script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash -n xmrig/rootfs/run.sh
+          echo "PASS: Legacy startup script syntax"
+
+      # ------------------------------------------
+      # 4. Validate add-on configurations
+      # ------------------------------------------
+
+      - name: Validate addon YAML files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+
+          for directory in ("xmrig", "xmrig_haos", "xmrig_haos_beta"):
+              path = Path(directory) / "config.yaml"
+
+              with path.open(encoding="utf-8") as stream:
+                  config = yaml.safe_load(stream)
+
+              assert isinstance(config, dict), (
+                  f"{path}: root must be a mapping"
+              )
+
+              required = (
+                  "name",
+                  "slug",
+                  "version",
+                  "arch",
+                  "options",
+                  "schema",
+              )
+
+              for key in required:
+                  assert key in config, (
+                      f"{path}: missing required key {key}"
+                  )
+
+              assert isinstance(config["options"], dict)
+              assert isinstance(config["schema"], dict)
+
+              for option in config["options"]:
+                  assert option in config["schema"], (
+                      f"{path}: option {option} has no schema"
+                  )
+
+              print(f"PASS: {path}")
+          PY
+
+      # ------------------------------------------
+      # 5. Verify HAOS Dockerfile
+      # ------------------------------------------
+
+      - name: Verify HAOS Dockerfile
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f xmrig_haos/Dockerfile
+          test -f xmrig_haos/rootfs/run.sh
+
+          grep -q 'XMRIG_SHA256' xmrig_haos/Dockerfile
+          grep -q 'sha256sum -c' xmrig_haos/Dockerfile
+          grep -q 'ENTRYPOINT' xmrig_haos/Dockerfile
+
+          echo "PASS: HAOS Dockerfile basic checks"
+
+      # ------------------------------------------
+      # 6. Verify HAOS safe architecture
+      # ------------------------------------------
+
+      - name: Verify safe architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import yaml
+
+          with open(
+              "xmrig_haos/config.yaml",
+              encoding="utf-8"
+          ) as stream:
+              config = yaml.safe_load(stream)
+
+          assert config.get("full_access", False) is False
+          assert config.get("host_network", False) is False
+          assert config.get("host_pid", False) is False
+          assert config.get("apparmor", True) is not False
+
+          with open("xmrig_haos_beta/config.yaml", encoding="utf-8") as stream:
+              beta = yaml.safe_load(stream)
+          assert beta["slug"] == "xmrig_haos_beta"
+          assert beta["stage"] == "experimental"
+          assert beta["boot"] == "manual"
+          assert beta["init"] is False
+          assert beta["host_network"] is False
+          assert beta["host_pid"] is False
+          assert beta["full_access"] is False
+          assert beta["apparmor"] is True
+          assert beta["services"] == ["mqtt:want"]
+          assert beta["options"]["wallet"] == ""
+          assert "image" not in beta
+          assert "hassio_api" not in beta
+          assert "homeassistant_api" not in beta
+          print("PASS: HAOS Safe and isolated experimental beta permissions")
+          PY
+
+      # ------------------------------------------
+      # 7. Validate functional test scripts
+      # ------------------------------------------
+
+      - name: Check functional test script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash -n tests/test_run.sh
+          echo "PASS: Functional test script syntax"
+
+      # ------------------------------------------
+      # 8. Run XMRig functional tests
+      # ------------------------------------------
+
+      - name: Run HAOS startup functional tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash tests/test_run.sh
+
+      # ------------------------------------------
+      # 9. Validate release policy scripts
+      # ------------------------------------------
+
+      - name: Check release policy script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f scripts/release_policy.sh
+          test -f tests/test_release_policy.sh
+
+          bash -n scripts/release_policy.sh
+          bash -n tests/test_release_policy.sh
+
+          echo "PASS: Release policy script syntax"
+
+      # ------------------------------------------
+      # 10. Run release policy security tests
+      # ------------------------------------------
+
+      - name: Run release policy security tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bash tests/test_release_policy.sh
+
+      # ------------------------------------------
+      # 11. Validate Python source files
+      # ------------------------------------------
+
+      - name: Check Python source syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          files = (
+              Path("xmrig_haos/rootfs/app/config.py"),
+              Path("xmrig_haos/rootfs/app/miner_manager.py"),
+              Path("xmrig_haos/rootfs/app/main.py"),
+              Path("xmrig_haos/rootfs/app/xmrig_monitor.py"),
+              Path("xmrig_haos/rootfs/app/mqtt_discovery.py"),
+              Path("xmrig_haos/rootfs/app/mqtt_service.py"),
+              Path("xmrig_haos/rootfs/app/mqtt_client.py"),
+              Path("xmrig_haos/rootfs/app/mqtt_runtime.py"),
+              Path("xmrig_haos/rootfs/app/mqtt_commands.py"),
+              Path("xmrig_haos/rootfs/app/mining_state.py"),
+              Path("tests/test_config.py"),
+              Path("tests/test_miner_manager.py"),
+              Path("tests/test_main.py"),
+              Path("tests/test_xmrig_monitor.py"),
+              Path("tests/test_mqtt_discovery.py"),
+              Path("tests/test_mqtt_service.py"),
+              Path("tests/test_mqtt_client.py"),
+              Path("tests/test_mqtt_runtime.py"),
+              Path("tests/test_mqtt_commands.py"),
+              Path("tests/test_mining_state.py"),
+          )
+
+          for path in files:
+              assert path.is_file(), (
+                  f"Missing Python source: {path}"
+              )
+
+              source = path.read_text(encoding="utf-8")
+              ast.parse(source, filename=str(path))
+
+              print(f"PASS: Python syntax: {path}")
+          PY
+
+      # ------------------------------------------
+      # 12. Run Python configuration unit tests
+      # ------------------------------------------
+
+      - name: Run Python configuration unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python -m unittest discover \
+            -s tests \
+            -p 'test_config.py' \
+            -v
+
+          echo "PASS: Python configuration unit tests"
+
+      # ------------------------------------------
+      # 13. Run Python Miner Manager unit tests
+      # ------------------------------------------
+
+      - name: Run Python Miner Manager unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python -m unittest discover \
+            -s tests \
+            -p 'test_miner_manager.py' \
+            -v
+
+          echo "PASS: Python Miner Manager unit tests"
+
+      # ------------------------------------------
+      # 14. Run Python Main Controller unit tests
+      # ------------------------------------------
+
+      - name: Run Python Main Controller unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python -m unittest discover \
+            -s tests \
+            -p 'test_main.py' \
+            -v
+
+          echo "PASS: Python Main Controller unit tests"
+
+      # ------------------------------------------
+      # 15. Run Python HTTP monitoring unit tests
+      # ------------------------------------------
+
+      - name: Run Python HTTP monitoring unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python -m unittest discover \
+            -s tests \
+            -p 'test_xmrig_monitor.py' \
+            -v
+
+          echo "PASS: Python HTTP monitoring unit tests"
+
+      # ------------------------------------------
+      # 16. Test MQTT Discovery payloads without a broker
+      # ------------------------------------------
+
+      - name: Run MQTT Discovery unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests \
+            -p 'test_mqtt_discovery.py' \
+            -v
+          echo "PASS: MQTT Discovery payload tests"
+
+      # ------------------------------------------
+      # 17. Test Supervisor MQTT service and manual settings
+      # ------------------------------------------
+
+      - name: Run MQTT service discovery unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests \
+            -p 'test_mqtt_service.py' \
+            -v
+          echo "PASS: MQTT service discovery unit tests"
+
+      # ------------------------------------------
+      # 18. Test optional MQTT publisher transport offline
+      # ------------------------------------------
+
+      - name: Run MQTT publisher transport unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests \
+            -p 'test_mqtt_client.py' \
+            -v
+          echo "PASS: MQTT publisher transport unit tests"
+
+      # ------------------------------------------
+      # 19. Test optional MQTT Supervisor bootstrapping
+      # ------------------------------------------
+
+      - name: Run MQTT runtime bootstrap tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests \
+            -p 'test_mqtt_runtime.py' \
+            -v
+          echo "PASS: MQTT runtime bootstrap tests"
+
+      # ------------------------------------------
+      # 20. Reject unsafe MQTT commands and retained messages
+      # ------------------------------------------
+
+      - name: Run MQTT command mailbox tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests \
+            -p 'test_mqtt_commands.py' \
+            -v
+          echo "PASS: MQTT command mailbox tests"
+
+      # ------------------------------------------
+      # 21. Test persisted mining state and corruption recovery
+      # ------------------------------------------
+
+      - name: Run persisted mining state unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s tests \
+            -p 'test_mining_state.py' \
+            -v
+
+      # ------------------------------------------
+      # 22. Validation summary
+      # ------------------------------------------
+
+      - name: Validation summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================"
+          echo "XMRig 2.0 Validation Summary"
+          echo "======================================"
+          echo "HAOS startup functional scenarios: 20"
+          echo "Release policy security scenarios: 18"
+          echo "Python configuration unit tests: 23"
+          echo "Python Miner Manager unit tests: 28"
+          echo "Python Main Controller unit tests: 34"
+          echo "Python HTTP monitoring unit tests: 32"
+          echo "MQTT Discovery unit tests: 13"
+          echo "MQTT service discovery unit tests: 15"
+          echo "MQTT publisher transport unit tests: 23"
+          echo "MQTT runtime bootstrap tests: 4"
+          echo "MQTT command mailbox unit tests: 9"
+          echo "Persistent mining state unit tests: 14"
+          echo "Expected total scenarios: 233"
+          echo "======================================"
+          echo "All preceding validation steps passed."
+          echo "Real mining is not performed."
+          echo "Docker runtime is tested separately."

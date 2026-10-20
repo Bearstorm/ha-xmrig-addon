@@ -1,0 +1,39 @@
+name: "XMRig Miner 2.0 (Beta Test)"
+slug: xmrig_haos_beta
+description: >-
+  Experimental standalone HAOS test addon for Python Controller and MQTT.
+  Installs separately; does not replace XMRig Miner (HAOS Safe).
+version: "2.0.0-beta.2"
+stage: experimental
+url: "https://github.com/Bearstorm/ha-xmrig-addon"
+arch:
+  - amd64
+startup: services
+boot: manual
+init: false
+
+# Retain HAOS Safe isolation. No host privileges or network exposure.
+host_network: false
+host_pid: false
+full_access: false
+apparmor: true
+services:
+  - mqtt:want
+
+# Wallet is deliberately empty until the staging operator sets it.
+options:
+  pool: "pool.supportxmr.com"
+  port: 443
+  wallet: ""
+  worker: "HA-BETA"
+  threads: 2
+  priority: 2
+  tls_mode: "auto"
+schema:
+  pool: "str(1,255)"
+  port: port
+  wallet: str
+  worker: "str(1,64)"
+  threads: "int(1,256)"
+  priority: "int(0,5)"
+  tls_mode: "list(auto|enabled|disabled)"
