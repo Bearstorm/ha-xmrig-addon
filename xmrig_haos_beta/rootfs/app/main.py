@@ -66,6 +66,7 @@ class Controller:
         state_store: MiningStateStore | None = None,
         resource_monitor: ResourceMonitor | None = None,
         thermal_guard: ThermalGuard | None = None,
+        auto_start: bool = False,
     ) -> None:
         if poll_interval <= 0 or monitor_interval <= 0:
             raise ValueError("poll intervals must be positive")
@@ -77,6 +78,7 @@ class Controller:
         self._state_store = state_store
         self._resource_monitor = resource_monitor
         self._thermal_guard = thermal_guard
+        self._auto_start = auto_start
         self._thermal_next = 0.0
         self._thermal_latched = False
         self._resource_thread: threading.Thread | None = None
@@ -187,6 +189,8 @@ class Controller:
         LOG.warning("Thermal protection tripped: %s", reason)
         if self._state_store is not None:
             try:
+                self._state_store.mark_thermal()
+                self._state_store.clear_manual()
                 self._state_store.save(False)
             except StateStoreError:
                 self._failed_off_persistence = True
@@ -218,6 +222,8 @@ class Controller:
             if self._state_store is not None:
                 try:
                     self._state_store.save(False)
+                    self._state_store.clear_manual()
+                    self._state_store.clear_thermal()
                 except StateStoreError:
                     saved_off = False
                     self._failed_off_persistence = True
@@ -242,6 +248,8 @@ class Controller:
                     self._state_store.arm()
                     self._armed_by_this_session = True
                     self._state_store.save(True)
+                    self._state_store.clear_manual()
+                    self._state_store.clear_thermal()
                 except StateStoreError:
                     LOG.warning("Unable to safely arm mining; miner remains stopped")
                     return
@@ -272,14 +280,37 @@ class Controller:
                 should_start = True
                 if self._state_store is not None:
                     try:
-                        should_start = self._state_store.load()
+                        first_start = self._state_store.is_first_start() if self._auto_start else False
+                        saved_on = self._state_store.load()
+                        pending_manual = self._state_store.manual_pending()
+                        thermal_trip = self._state_store.thermal_tripped()
+                        # Automatic mode is a startup policy, not the persisted
+                        # runtime MQTT ON/OFF preference. A prior MQTT OFF
+                        # must not prevent the next automatic startup.
+                        # Thermal and crash latches remain authoritative.
+                        should_start = self._auto_start and not thermal_trip
                         if self._state_store.guard_exists():
                             LOG.warning("Unclean previous shutdown; mining remains OFF")
                             should_start = False
+                        elif not self._auto_start:
+                            # Explicit manual mode can later transition back to auto.
+                            # Never erase a thermal safety latch or an unknown legacy OFF.
+                            # A user-selected manual session records the mode,
+                            # even when an older version already persisted OFF.
+                            # Thermal and crash safety latches remain authoritative.
+                            self._state_store.mark_manual()
+                            self._state_store.save(False)
+                            should_start = False
                         if should_start:
-                            # A crash while running leaves the guard in place.
+                            # Persist the startup request before spawning the miner.
+                            # An unexpected crash must never silently restart mining.
                             self._state_store.arm()
                             self._armed_by_this_session = True
+                            # Record ON for the active session. This does not
+                            # override the thermal or crash startup guards.
+                            self._state_store.save(True)
+                            if pending_manual:
+                                self._state_store.clear_manual()
                     except StateStoreError:
                         LOG.warning("Unsafe mining state or storage; starting safely OFF")
                         should_start = False
@@ -407,7 +438,8 @@ def main(
         return 1
     controller = Controller(manager, monitor=monitor, publisher=publisher,
                             state_store=state_store, resource_monitor=resource_monitor,
-                            thermal_guard=thermal_guard)
+                            thermal_guard=thermal_guard,
+                            auto_start=(thermal_guard is not None and thermal_guard.start_mode == "automatic"))
     previous_handlers: dict[signal.Signals, object] = {}
     try:
         if install_signals:

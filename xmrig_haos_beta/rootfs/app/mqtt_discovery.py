@@ -52,8 +52,8 @@ class MqttMessage:
 class DiscoveryPayloads:
     """Create fixed-shape MQTT messages; never serialize wallet or pool credentials."""
 
-    def __init__(self, *, node_id: str = "xmrig_haos_beta", prefix: str = "homeassistant",
-                 base_topic: str = "xmrig_haos_beta") -> None:
+    def __init__(self, *, node_id: str = "xmrig_haos_thermal_test", prefix: str = "homeassistant",
+                 base_topic: str = "xmrig_haos_thermal_test") -> None:
         for name, value in (("node_id", node_id), ("prefix", prefix), ("base_topic", base_topic)):
             if not isinstance(value, str) or not re.fullmatch(r"[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*", value):
                 raise ValueError(f"invalid {name}")
@@ -88,7 +88,7 @@ class DiscoveryPayloads:
         return f"{self.base_topic}/command"
 
     def discovery_messages(self) -> list[MqttMessage]:
-        device = {"identifiers": [self.node_id], "name": "XMRig Miner 2.0",
+        device = {"identifiers": [self.node_id], "name": "XMRig Miner 2.0 Thermal Test",
                   "manufacturer": "XMRig", "model": "HAOS Safe"}
         messages: list[MqttMessage] = []
         for key, label, unit, state_class, icon in SENSORS:

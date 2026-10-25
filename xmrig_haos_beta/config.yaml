@@ -1,9 +1,9 @@
-name: "XMRig Miner 2.0 (Beta Test)"
+name: "XMRig Miner 2.0 (All-in-One Beta)"
 slug: xmrig_haos_beta
 description: >-
-  Experimental standalone HAOS test addon for Python Controller and MQTT.
-  Installs separately; does not replace XMRig Miner (HAOS Safe).
-version: "2.0.0-beta.3-test.1"
+  All-in-One HAOS beta with MQTT, telemetry and CPU thermal protection.
+  Installs separately from stable XMRig Miner (HAOS Safe).
+version: "2.0.0-beta.3"
 stage: experimental
 url: "https://github.com/Bearstorm/ha-xmrig-addon"
 arch:
@@ -30,6 +30,7 @@ options:
   threads: 2
   priority: 2
   tls_mode: "auto"
+  mining_start_mode: "automatic"
   thermal_protection_enabled: false
   thermal_sensor_entity: ""
   thermal_limit: 80
@@ -43,6 +44,7 @@ schema:
   threads: "int(1,256)"
   priority: "int(0,5)"
   tls_mode: "list(auto|enabled|disabled)"
+  mining_start_mode: "list(automatic|manual)"
   thermal_protection_enabled: bool
   thermal_sensor_entity: str
   thermal_limit: "int(40,105)"

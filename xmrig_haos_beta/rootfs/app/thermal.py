@@ -13,6 +13,9 @@ class ThermalGuard:
     def __init__(self, path="/data/options.json"):
         with open(path, encoding="utf-8") as stream:
             options = json.load(stream)
+        self.start_mode = options.get("mining_start_mode", "manual")
+        if self.start_mode not in ("manual", "automatic") or not isinstance(self.start_mode, str):
+            raise ValueError("Invalid mining start mode")
         self.enabled = options.get("thermal_protection_enabled", False)
         self.entity = options.get("thermal_sensor_entity", "")
         self.limit = options.get("thermal_limit", 80)
@@ -72,7 +75,7 @@ class ThermalGuard:
         try:
             self.api("/services/persistent_notification/create", {
                 "title": "XMRig - Thermal Protection",
-                "notification_id": "xmrig_haos_beta_thermal",
+                "notification_id": "xmrig_haos_thermal_test_thermal",
                 "message": "Mining shutdown requested. Reason: " + reason
                     + ". CPU temperature: " + value
                     + ". Configured limit: " + str(self.limit) + " °C."
