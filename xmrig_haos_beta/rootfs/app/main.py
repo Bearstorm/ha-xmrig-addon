@@ -176,14 +176,18 @@ class Controller:
         guard = self._thermal_guard
         if guard is None or not guard.enabled:
             return True
-        if self._thermal_latched:
+        if self._thermal_latched and not force:
             return False
+        # An explicit ON request may recheck the sensor after a thermal trip.
+        # Periodic polling must never restart mining automatically.
         now = time.monotonic()
         if not force and now < self._thermal_next:
             return True
         self._thermal_next = now + 30
         safe, reason, temperature = guard.check()
         if safe:
+            if force:
+                self._thermal_latched = False
             return True
         self._thermal_latched = True
         LOG.warning("Thermal protection tripped: %s", reason)
