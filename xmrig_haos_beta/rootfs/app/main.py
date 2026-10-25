@@ -401,7 +401,7 @@ def main(
         except (OSError, ValueError):
             LOG.warning("Optional resource monitor unavailable")
     try:
-        thermal_guard = ThermalGuard()
+        thermal_guard = ThermalGuard() if config_loader is load_config else None
     except (OSError, ValueError, TypeError):
         LOG.error("Invalid thermal configuration; startup blocked")
         return 1
