@@ -284,7 +284,11 @@ class Controller:
                         saved_on = self._state_store.load()
                         pending_manual = self._state_store.manual_pending()
                         thermal_trip = self._state_store.thermal_tripped()
-                        should_start = self._auto_start and (saved_on or first_start or pending_manual) and not thermal_trip
+                        # Automatic mode is a startup policy, not the persisted
+                        # runtime MQTT ON/OFF preference. A prior MQTT OFF
+                        # must not prevent the next automatic startup.
+                        # Thermal and crash latches remain authoritative.
+                        should_start = self._auto_start and not thermal_trip
                         if self._state_store.guard_exists():
                             LOG.warning("Unclean previous shutdown; mining remains OFF")
                             should_start = False
@@ -302,8 +306,9 @@ class Controller:
                             # An unexpected crash must never silently restart mining.
                             self._state_store.arm()
                             self._armed_by_this_session = True
-                            if first_start or pending_manual:
-                                self._state_store.save(True)
+                            # Record ON for the active session. This does not
+                            # override the thermal or crash startup guards.
+                            self._state_store.save(True)
                             if pending_manual:
                                 self._state_store.clear_manual()
                     except StateStoreError:

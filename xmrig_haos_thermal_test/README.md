@@ -284,3 +284,8 @@ An explicit manual session can transition back to automatic startup on the next 
 ### Manual → automatic transition correction (.5)
 
 Entering `manual` now records an explicit manual-mode transition even if an older release already saved Mining OFF. Returning to `automatic` after restarting in `manual` can therefore start mining without an MQTT ON command. This does not bypass a recorded thermal trip, unclean shutdown guard, or the live thermal safety check. A previously saved OFF without a recorded manual-mode transition remains OFF.
+
+
+### Automatic startup policy (.6)
+
+In `automatic`, each normal add-on startup requests mining ON, even if the last runtime MQTT command was OFF. MQTT OFF stops the current mining session, not the next automatic startup. `manual` always starts mining OFF and accepts MQTT ON/OFF. A persisted thermal trip or unclean shutdown guard **always** blocks automatic startup. Switching modes or restarting never clears those safety latches; a deliberate MQTT ON is still checked against the live temperature before clearing a thermal trip. This supersedes earlier saved-OFF behavior described above.

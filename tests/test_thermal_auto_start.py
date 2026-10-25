@@ -97,6 +97,24 @@ class AutoStartTests(unittest.TestCase):
         next_manager.start.assert_not_called()
         self.assertTrue(store.thermal_tripped())
 
+    def test_mqtt_off_then_manual_then_auto(self):
+        controller, manager, store, _ = self.make(mode="manual")
+        store.save(False)  # Previous MQTT OFF persisted by older versions
+        controller.run()
+        manager.start.assert_not_called()
+        auto, auto_manager, _, _ = self.make()
+        auto._state_store = store
+        auto.run()
+        auto_manager.start.assert_called_once()
+
+    def test_mqtt_off_does_not_clear_thermal_latch(self):
+        controller, manager, store, _ = self.make()
+        store.save(False)
+        store.mark_thermal()
+        controller.run()
+        manager.start.assert_not_called()
+        self.assertTrue(store.thermal_tripped())
+
     def test_thermal_marker_blocks_auto_after_manual(self):
         controller, manager, store, _ = self.make(mode="manual")
         store.save(True)
@@ -108,12 +126,12 @@ class AutoStartTests(unittest.TestCase):
         next_manager.start.assert_not_called()
         self.assertTrue(store.thermal_tripped())
 
-    def test_saved_off_overrides_automatic(self):
+    def test_saved_mqtt_off_does_not_block_automatic(self):
         controller, manager, store, _ = self.make()
         store.save(False)
         controller.run()
-        manager.start.assert_not_called()
-        self.assertFalse(store.load())
+        manager.start.assert_called_once()
+        self.assertTrue(store.load())
 
     def test_thermal_trip_stays_off(self):
         controller, manager, store, guard = self.make(thermal=True)
