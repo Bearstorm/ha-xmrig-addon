@@ -264,3 +264,8 @@ The add-on Configuration panel includes optional, default-OFF thermal protection
 ## Installing the independent thermal test
 
 Add a second custom add-on repository URL ending in `#feature/beta-integrated-thermal-protection` (or change the existing repo source only if you accept that it exposes development updates). Refresh the add-on store and select **XMRig Miner 2.0 (Thermal Test)**, slug `xmrig_haos_thermal_test`. It has independent data, options, MQTT discovery IDs, and MQTT command topics; do not run both mining instances concurrently. Keep the published Beta.2 untouched. Set a valid wallet, enable protection and set an existing temperature entity. If the Core API omits `last_reported`, mining will be blocked intentionally. This is a test candidate, not a public release.
+
+
+### Mining start mode (Thermal Test .2)
+
+`mining_start_mode` defaults to `automatic` for **new installs**: on first add-on start, mining begins only after the existing thermal safety check passes. `manual` starts the controller and MQTT monitoring but does not start mining until the MQTT Mining switch is turned ON. The mode is selected in the add-on Configuration; save and restart the add-on to apply it. The MQTT Mining switch continues to provide runtime ON/OFF control. An existing saved OFF state, including a thermal trip, always wins over `automatic`; changing the mode does **not** reset a safety latch or force mining back ON. An unexpected shutdown guard also blocks automatic restart. This is a first-start preference, not a second live Start button.

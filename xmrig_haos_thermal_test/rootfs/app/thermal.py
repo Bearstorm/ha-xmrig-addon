@@ -13,6 +13,9 @@ class ThermalGuard:
     def __init__(self, path="/data/options.json"):
         with open(path, encoding="utf-8") as stream:
             options = json.load(stream)
+        self.start_mode = options.get("mining_start_mode", "manual")
+        if self.start_mode not in ("manual", "automatic") or not isinstance(self.start_mode, str):
+            raise ValueError("Invalid mining start mode")
         self.enabled = options.get("thermal_protection_enabled", False)
         self.entity = options.get("thermal_sensor_entity", "")
         self.limit = options.get("thermal_limit", 80)

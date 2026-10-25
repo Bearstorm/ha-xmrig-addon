@@ -22,6 +22,16 @@ class MiningStateStore:
     def __init__(self, path: Path = DEFAULT_STATE_PATH) -> None:
         self.path = Path(path)
 
+    def is_first_start(self) -> bool:
+        """True only if no saved mining preference exists; storage errors fail closed."""
+        try:
+            self.path.stat()
+            return False
+        except FileNotFoundError:
+            return True
+        except OSError:
+            raise StateStoreError("Unable to inspect mining state") from None
+
     def load(self) -> bool:
         """Beta first startup is OFF; invalid file also fails closed OFF."""
         try:

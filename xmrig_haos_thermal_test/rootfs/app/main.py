@@ -66,6 +66,7 @@ class Controller:
         state_store: MiningStateStore | None = None,
         resource_monitor: ResourceMonitor | None = None,
         thermal_guard: ThermalGuard | None = None,
+        auto_start: bool = False,
     ) -> None:
         if poll_interval <= 0 or monitor_interval <= 0:
             raise ValueError("poll intervals must be positive")
@@ -77,6 +78,7 @@ class Controller:
         self._state_store = state_store
         self._resource_monitor = resource_monitor
         self._thermal_guard = thermal_guard
+        self._auto_start = auto_start
         self._thermal_next = 0.0
         self._thermal_latched = False
         self._resource_thread: threading.Thread | None = None
@@ -272,14 +274,18 @@ class Controller:
                 should_start = True
                 if self._state_store is not None:
                     try:
-                        should_start = self._state_store.load()
+                        first_start = self._state_store.is_first_start() if self._auto_start else False
+                        should_start = self._state_store.load() or first_start
                         if self._state_store.guard_exists():
                             LOG.warning("Unclean previous shutdown; mining remains OFF")
                             should_start = False
                         if should_start:
-                            # A crash while running leaves the guard in place.
+                            # Persist the startup request before spawning the miner.
+                            # An unexpected crash must never silently restart mining.
                             self._state_store.arm()
                             self._armed_by_this_session = True
+                            if first_start:
+                                self._state_store.save(True)
                     except StateStoreError:
                         LOG.warning("Unsafe mining state or storage; starting safely OFF")
                         should_start = False
@@ -407,7 +413,8 @@ def main(
         return 1
     controller = Controller(manager, monitor=monitor, publisher=publisher,
                             state_store=state_store, resource_monitor=resource_monitor,
-                            thermal_guard=thermal_guard)
+                            thermal_guard=thermal_guard,
+                            auto_start=(thermal_guard is not None and thermal_guard.start_mode == "automatic"))
     previous_handlers: dict[signal.Signals, object] = {}
     try:
         if install_signals:
