@@ -269,3 +269,8 @@ Add a second custom add-on repository URL ending in `#feature/beta-integrated-th
 ### Mining start mode (Thermal Test .2)
 
 `mining_start_mode` defaults to `automatic` for **new installs**: on first add-on start, mining begins only after the existing thermal safety check passes. `manual` starts the controller and MQTT monitoring but does not start mining until the MQTT Mining switch is turned ON. The mode is selected in the add-on Configuration; save and restart the add-on to apply it. The MQTT Mining switch continues to provide runtime ON/OFF control. An existing saved OFF state, including a thermal trip, always wins over `automatic`; changing the mode does **not** reset a safety latch or force mining back ON. An unexpected shutdown guard also blocks automatic restart. This is a first-start preference, not a second live Start button.
+
+
+### Manual mode fix (.3)
+
+`manual` now **always starts with Mining OFF**, even when the previous session saved Mining ON. The saved preference is reset to OFF on manual startup. Use the MQTT Mining switch to start mining after the add-on starts. `automatic` resumes a previously saved ON preference or starts on a clean first install; a saved OFF preference and crash guard still block automatic mining. Thermal protection remains authoritative in both modes.

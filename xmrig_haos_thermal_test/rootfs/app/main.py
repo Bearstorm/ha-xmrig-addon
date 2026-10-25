@@ -279,6 +279,12 @@ class Controller:
                         if self._state_store.guard_exists():
                             LOG.warning("Unclean previous shutdown; mining remains OFF")
                             should_start = False
+                        elif not self._auto_start:
+                            # Manual mode never resumes mining on add-on startup.
+                            # Clear a previously saved ON preference, so changing
+                            # back to automatic cannot resurrect that old request.
+                            self._state_store.save(False)
+                            should_start = False
                         if should_start:
                             # Persist the startup request before spawning the miner.
                             # An unexpected crash must never silently restart mining.

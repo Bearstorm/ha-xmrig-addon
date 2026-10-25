@@ -52,7 +52,14 @@ class AutoStartTests(unittest.TestCase):
         controller, manager, store, _ = self.make(mode="manual")
         controller.run()
         manager.start.assert_not_called()
-        self.assertTrue(store.is_first_start())
+        self.assertFalse(store.load())
+
+    def test_manual_does_not_resume_saved_on(self):
+        controller, manager, store, _ = self.make(mode="manual")
+        store.save(True)
+        controller.run()
+        manager.start.assert_not_called()
+        self.assertFalse(store.load())
 
     def test_saved_off_overrides_automatic(self):
         controller, manager, store, _ = self.make()
