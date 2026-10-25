@@ -274,3 +274,8 @@ Add a second custom add-on repository URL ending in `#feature/beta-integrated-th
 ### Manual mode fix (.3)
 
 `manual` now **always starts with Mining OFF**, even when the previous session saved Mining ON. The saved preference is reset to OFF on manual startup. Use the MQTT Mining switch to start mining after the add-on starts. `automatic` resumes a previously saved ON preference or starts on a clean first install; a saved OFF preference and crash guard still block automatic mining. Thermal protection remains authoritative in both modes.
+
+
+### Manual → automatic transition (.4)
+
+An explicit manual session can transition back to automatic startup on the next add-on restart. A separate persistent thermal safety marker blocks automatic restart after a thermal trip, even when the sensor later cools. A previously saved OFF state with no recorded manual transition remains OFF (including older installs); users can explicitly enable mining via MQTT once to establish a new ON preference. The configuration mode takes effect after saving and restarting the add-on. The safety latch is not reset merely by changing modes.

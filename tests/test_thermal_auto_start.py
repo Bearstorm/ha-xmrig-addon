@@ -61,6 +61,28 @@ class AutoStartTests(unittest.TestCase):
         manager.start.assert_not_called()
         self.assertFalse(store.load())
 
+    def test_manual_to_automatic_transition(self):
+        controller, manager, store, _ = self.make(mode="manual")
+        store.save(True)
+        controller.run()
+        self.assertTrue(store.manual_pending())
+        next_controller, next_manager, _, _ = self.make()
+        next_controller._state_store = store
+        next_controller.run()
+        next_manager.start.assert_called_once()
+        self.assertFalse(store.manual_pending())
+
+    def test_thermal_marker_blocks_auto_after_manual(self):
+        controller, manager, store, _ = self.make(mode="manual")
+        store.save(True)
+        store.mark_thermal()
+        controller.run()
+        next_controller, next_manager, _, _ = self.make()
+        next_controller._state_store = store
+        next_controller.run()
+        next_manager.start.assert_not_called()
+        self.assertTrue(store.thermal_tripped())
+
     def test_saved_off_overrides_automatic(self):
         controller, manager, store, _ = self.make()
         store.save(False)
