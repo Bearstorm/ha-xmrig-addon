@@ -31,6 +31,7 @@ def write_options(wallet: str = "STAGING-TEST-IDENTIFIER") -> None:
             "threads": 1,
             "priority": 2,
             "tls_mode": "auto",
+            "mining_start_mode": "manual",
         }),
         encoding="utf-8",
     )

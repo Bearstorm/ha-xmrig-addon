@@ -223,7 +223,7 @@ class Controller:
                 try:
                     self._state_store.save(False)
                     self._state_store.clear_manual()
-                    self._state_store.clear_thermal()
+                    # OFF must never clear a thermal trip; only a checked ON may do so.
                 except StateStoreError:
                     saved_off = False
                     self._failed_off_persistence = True
