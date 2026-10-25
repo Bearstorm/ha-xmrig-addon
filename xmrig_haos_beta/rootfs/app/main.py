@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import signal
+import time
 import threading
 from collections.abc import Callable
 from typing import Protocol
@@ -16,6 +17,7 @@ from .miner_manager import MinerError, MinerManager, MinerState
 from .mining_state import MiningStateStore, StateStoreError
 from .xmrig_monitor import MinerSnapshot, XmrigMonitor
 from .resource_monitor import ResourceMonitor
+from .thermal import ThermalGuard
 
 LOG = logging.getLogger("xmrig-controller")
 POLL_INTERVAL_SECONDS = 1.0
@@ -63,6 +65,7 @@ class Controller:
         publisher: PublisherProtocol | None = None,
         state_store: MiningStateStore | None = None,
         resource_monitor: ResourceMonitor | None = None,
+        thermal_guard: ThermalGuard | None = None,
     ) -> None:
         if poll_interval <= 0 or monitor_interval <= 0:
             raise ValueError("poll intervals must be positive")
@@ -73,6 +76,9 @@ class Controller:
         self._publisher = publisher
         self._state_store = state_store
         self._resource_monitor = resource_monitor
+        self._thermal_guard = thermal_guard
+        self._thermal_next = 0.0
+        self._thermal_latched = False
         self._resource_thread: threading.Thread | None = None
         self._armed_by_this_session = False
         self._failed_off_persistence = False
@@ -164,6 +170,39 @@ class Controller:
         except Exception:
             LOG.warning("Optional MQTT publisher failed; mining continues")
 
+    def _thermal_check(self, force=False):
+        guard = self._thermal_guard
+        if guard is None or not guard.enabled:
+            return True
+        if self._thermal_latched:
+            return False
+        now = time.monotonic()
+        if not force and now < self._thermal_next:
+            return True
+        self._thermal_next = now + 30
+        safe, reason, temperature = guard.check()
+        if safe:
+            return True
+        self._thermal_latched = True
+        LOG.warning("Thermal protection tripped: %s", reason)
+        if self._state_store is not None:
+            try:
+                self._state_store.save(False)
+            except StateStoreError:
+                self._failed_off_persistence = True
+                LOG.warning("Thermal OFF persistence failed; startup guard retained")
+        if self._manager.desired_running:
+            self._manager.stop()
+            self._update_process(MinerState.STOPPED)
+        if self._state_store is not None and not self._failed_off_persistence:
+            try:
+                self._state_store.disarm()
+                self._armed_by_this_session = False
+            except StateStoreError:
+                LOG.warning("Thermal guard marker retained")
+        guard.notify(reason, temperature)
+        return False
+
     def _apply_mqtt_command(self) -> None:
         """Apply one bounded MQTT request only from the Controller thread."""
         commands = getattr(self._publisher, "commands", None)
@@ -194,6 +233,9 @@ class Controller:
                 except StateStoreError:
                     LOG.warning("Unable to clear startup guard; next startup will remain OFF")
         elif command == "ON" and not self._manager.desired_running:
+            if not self._thermal_check(force=True):
+                LOG.warning("Mining ON rejected by thermal protection")
+                return
             if self._state_store is not None:
                 try:
                     # Arm guard first, before storing ON or spawning a process.
@@ -241,7 +283,7 @@ class Controller:
                     except StateStoreError:
                         LOG.warning("Unsafe mining state or storage; starting safely OFF")
                         should_start = False
-                if should_start:
+                if should_start and self._thermal_check(force=True):
                     self._manager.start()
                 else:
                     self._publish_snapshot(
@@ -250,6 +292,7 @@ class Controller:
                     )
                 self._update_process(self._manager.state)
             while not self._stop_event.is_set():
+                self._thermal_check()
                 self._apply_mqtt_command()
                 state = self._manager.reconcile()
                 self._update_process(state)
@@ -357,8 +400,14 @@ def main(
             resource_monitor = resource_monitor_factory()
         except (OSError, ValueError):
             LOG.warning("Optional resource monitor unavailable")
+    try:
+        thermal_guard = ThermalGuard()
+    except (OSError, ValueError, TypeError):
+        LOG.error("Invalid thermal configuration; startup blocked")
+        return 1
     controller = Controller(manager, monitor=monitor, publisher=publisher,
-                            state_store=state_store, resource_monitor=resource_monitor)
+                            state_store=state_store, resource_monitor=resource_monitor,
+                            thermal_guard=thermal_guard)
     previous_handlers: dict[signal.Signals, object] = {}
     try:
         if install_signals:

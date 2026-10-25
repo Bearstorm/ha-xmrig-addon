@@ -252,3 +252,10 @@ The software is provided **"AS IS", without warranty of any kind**, under the te
 <a href="https://www.paypal.com/donate/?hosted_button_id=PVATF8G5NZ392">
   <img src="https://raw.githubusercontent.com/andreostrovsky/donate-with-paypal/925c5a9e397363c6f7a477973fdeed485df5fdd9/blue.svg" alt="Donate with PayPal" height="40"/>
 </a>
+
+
+## Integrated thermal protection (experimental development branch only)
+
+The add-on Configuration panel includes optional, default-OFF thermal protection. Users select an existing Home Assistant temperature entity and set the limit (80 °C example), report timeout (180 seconds example) and notifications. No separate Blueprint or HA automation is required. The controller checks every 30 seconds and before Mining ON. Unsafe temperatures, missing/stale sensor reports, and API errors fail closed and latch mining OFF until add-on restart. Notifications are best-effort English persistent notifications. No host privileges or direct host thermal access are required; Supervisor Core API access is requested via homeassistant_api.
+
+**Important:** the Core states API may omit last_reported even if HA templates expose it. This implementation intentionally blocks mining when that field is missing. Verify API compatibility and actual behavior on HAOS before merging or publishing. This is not a substitute for hardware thermal safeguards. The published beta.2 is unchanged.

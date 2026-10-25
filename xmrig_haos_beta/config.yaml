@@ -19,6 +19,7 @@ full_access: false
 apparmor: true
 services:
   - mqtt:want
+homeassistant_api: true
 
 # Wallet is deliberately empty until the staging operator sets it.
 options:
@@ -29,6 +30,11 @@ options:
   threads: 2
   priority: 2
   tls_mode: "auto"
+  thermal_protection_enabled: false
+  thermal_sensor_entity: ""
+  thermal_limit: 80
+  thermal_sensor_timeout: 180
+  thermal_notifications: true
 schema:
   pool: "str(1,255)"
   port: port
@@ -37,3 +43,8 @@ schema:
   threads: "int(1,256)"
   priority: "int(0,5)"
   tls_mode: "list(auto|enabled|disabled)"
+  thermal_protection_enabled: bool
+  thermal_sensor_entity: str
+  thermal_limit: "int(40,105)"
+  thermal_sensor_timeout: "int(60,3600)"
+  thermal_notifications: bool
