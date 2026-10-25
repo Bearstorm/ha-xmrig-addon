@@ -7,10 +7,11 @@ root=Path(__file__).resolve().parents[1]
 addon=root/"xmrig_haos_beta"
 cfg=yaml.safe_load((addon/"config.yaml").read_text(encoding="utf-8"))
 docker=(addon/"Dockerfile").read_text(encoding="utf-8")
-must_false=("host_network","host_pid","full_access","hassio_api","homeassistant_api",
+must_false=("host_network","host_pid","full_access","hassio_api",
             "docker_api","kernel_modules","uart","usb","udev","video","audio")
 for key in must_false:
     assert cfg.get(key,False) is False, f"Unsafe beta setting: {key}"
+assert cfg.get("homeassistant_api") is True  # Optional Core API for thermal monitoring only
 assert cfg.get("apparmor") is True
 assert cfg.get("init") is False
 assert cfg.get("boot") == "manual"

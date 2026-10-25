@@ -62,7 +62,7 @@ class ThermalGuard:
             if value > self.limit:
                 return False, "temperature_limit_exceeded", value
             return True, "ok", value
-        except Exception:
+        except (OSError, ValueError, KeyError, TypeError, OverflowError, IndexError):
             return False, "sensor_unavailable", None
 
     def notify(self, reason, temperature):
@@ -77,5 +77,5 @@ class ThermalGuard:
                     + ". CPU temperature: " + value
                     + ". Configured limit: " + str(self.limit) + " °C."
             })
-        except Exception:
+        except (OSError, ValueError, TypeError):
             pass
