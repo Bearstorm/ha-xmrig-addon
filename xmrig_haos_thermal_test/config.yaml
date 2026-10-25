@@ -3,7 +3,7 @@ slug: xmrig_haos_thermal_test
 description: >-
   Isolated thermal-protection test add-on; installs alongside Beta.2.
   Installs separately; does not replace XMRig Miner (HAOS Safe).
-version: "2.0.0-thermal-test.4"
+version: "2.0.0-thermal-test.5"
 stage: experimental
 url: "https://github.com/Bearstorm/ha-xmrig-addon"
 arch:

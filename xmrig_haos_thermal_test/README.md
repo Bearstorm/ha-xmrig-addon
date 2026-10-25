@@ -279,3 +279,8 @@ Add a second custom add-on repository URL ending in `#feature/beta-integrated-th
 ### Manual → automatic transition (.4)
 
 An explicit manual session can transition back to automatic startup on the next add-on restart. A separate persistent thermal safety marker blocks automatic restart after a thermal trip, even when the sensor later cools. A previously saved OFF state with no recorded manual transition remains OFF (including older installs); users can explicitly enable mining via MQTT once to establish a new ON preference. The configuration mode takes effect after saving and restarting the add-on. The safety latch is not reset merely by changing modes.
+
+
+### Manual → automatic transition correction (.5)
+
+Entering `manual` now records an explicit manual-mode transition even if an older release already saved Mining OFF. Returning to `automatic` after restarting in `manual` can therefore start mining without an MQTT ON command. This does not bypass a recorded thermal trip, unclean shutdown guard, or the live thermal safety check. A previously saved OFF without a recorded manual-mode transition remains OFF.

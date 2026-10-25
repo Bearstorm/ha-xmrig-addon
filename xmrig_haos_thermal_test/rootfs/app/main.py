@@ -291,8 +291,10 @@ class Controller:
                         elif not self._auto_start:
                             # Explicit manual mode can later transition back to auto.
                             # Never erase a thermal safety latch or an unknown legacy OFF.
-                            if saved_on or first_start or pending_manual:
-                                self._state_store.mark_manual()
+                            # A user-selected manual session records the mode,
+                            # even when an older version already persisted OFF.
+                            # Thermal and crash safety latches remain authoritative.
+                            self._state_store.mark_manual()
                             self._state_store.save(False)
                             should_start = False
                         if should_start:

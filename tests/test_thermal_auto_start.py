@@ -72,6 +72,31 @@ class AutoStartTests(unittest.TestCase):
         next_manager.start.assert_called_once()
         self.assertFalse(store.manual_pending())
 
+    def test_legacy_saved_off_manual_to_auto(self):
+        # Regression: .3/.4 may have already stored OFF before mode changes.
+        controller, manager, store, _ = self.make(mode="manual")
+        store.save(False)
+        controller.run()
+        manager.start.assert_not_called()
+        self.assertTrue(store.manual_pending())
+        next_controller, next_manager, _, _ = self.make()
+        next_controller._state_store = store
+        next_controller.run()
+        next_manager.start.assert_called_once()
+        self.assertFalse(store.manual_pending())
+
+    def test_legacy_saved_off_thermal_latch_blocks_auto(self):
+        controller, manager, store, _ = self.make(mode="manual")
+        store.save(False)
+        store.mark_thermal()
+        controller.run()
+        self.assertTrue(store.manual_pending())
+        next_controller, next_manager, _, _ = self.make()
+        next_controller._state_store = store
+        next_controller.run()
+        next_manager.start.assert_not_called()
+        self.assertTrue(store.thermal_tripped())
+
     def test_thermal_marker_blocks_auto_after_manual(self):
         controller, manager, store, _ = self.make(mode="manual")
         store.save(True)
