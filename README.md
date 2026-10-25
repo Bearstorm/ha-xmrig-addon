@@ -1,5 +1,8 @@
 # 🪙 XMRig Miner Add-on for Home Assistant
 
+> **New in the release candidate: XMRig Miner 2.0 All-in-One Beta 3** — the integrated `xmrig_haos_beta` add-on now combines XMRig, MQTT Mining ON/OFF, resource telemetry, automatic/manual startup and fail-closed CPU thermal protection. See [All-in-One Beta 3 documentation](xmrig_haos_beta/README.md). This candidate is in the `feature/beta-integrated-thermal-protection` branch; stable `main` and the published Beta.2 tag are unchanged. Do not install the separate Thermal Test for this release. The integrated candidate still requires its own validation before tagging.
+
+
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
 ![Architecture](https://img.shields.io/badge/Arch-amd64-orange.svg)
@@ -31,7 +34,7 @@ Configurable **Monero (XMR)** mining add-on for Home Assistant OS on **x86_64 (a
 |-------------|---------------------|
 | Home Assistant OS (HAOS), amd64 | **XMRig Miner (HAOS Safe)** |
 | Existing legacy Home Assistant Supervised deployment | **XMRig Miner (Supervised / MSR)** (unsupported Home Assistant installation method) |
-| Experienced HAOS beta tester (amd64) | **XMRig Miner 2.0 (Beta Test)** (standalone experimental beta.2 candidate; separate from stable) |
+| Experienced HAOS beta tester (amd64) | **XMRig Miner 2.0 (All-in-One Beta)** (Beta 3 release candidate on feature branch; separate from stable) |
 
 ### How to check your system:
 Go to:
@@ -76,7 +79,7 @@ Settings → System → About
 | Recommended for new Home Assistant installs | ✅ (HAOS) | ❌ |
 | Python MQTT Discovery / Mining switch in stable image | ❌ | ❌ |
 
-The separate **Beta Test** add-on includes a Python Controller, MQTT Discovery, Mining ON/OFF switch and resource telemetry. Version **2.0.0-beta.2** passed isolated CI and live tests on one real HAOS Supervisor. It remains experimental and separate from stable HAOS Safe.
+The **All-in-One Beta 3 candidate** includes a Python Controller, MQTT Discovery, Mining ON/OFF switch and resource telemetry. Version **2.0.0-beta.2** passed isolated CI and live tests on one real HAOS Supervisor. It remains experimental and separate from stable HAOS Safe.
 
 ---
 
