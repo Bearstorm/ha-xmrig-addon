@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "xmrig_haos_beta" / "rootfs"))
 from app.thermal import ThermalGuard
 from app.main import Controller
 from app.miner_manager import MinerState
+from app.mining_state import MiningStateStore
 
 class FakeResponse:
     def __init__(self, data):
@@ -27,10 +28,30 @@ class FakeManager:
         self.state = MinerState.RUNNING
         self.pid = 123
         self.stop_calls = 0
+        self.start_calls = 0
     def stop(self):
         self.stop_calls += 1
         self.desired_running = False
         self.state = MinerState.STOPPED
+
+    def start(self):
+        self.start_calls += 1
+        self.desired_running = True
+        self.state = MinerState.RUNNING
+        return True
+
+class FakeCommands:
+    def __init__(self, command):
+        self.command = command
+    def take(self):
+        command, self.command = self.command, None
+        return command
+
+class FakePublisher:
+    def __init__(self, command):
+        self.commands = FakeCommands(command)
+    def publish(self, *args, **kwargs):
+        return True
 
 class ThermalTests(unittest.TestCase):
     def guard(self, **changes):
@@ -80,6 +101,39 @@ class ThermalTests(unittest.TestCase):
         self.assertEqual(manager.stop_calls, 1)
         self.assertFalse(controller._thermal_check(force=True))
         self.assertEqual(manager.stop_calls, 1)
+    def test_explicit_ha_switch_on_after_trip_requires_safe_sensor(self):
+        # The Home Assistant MQTT Discovery switch uses the same ON command.
+        # This test exercises the real persistent thermal marker and controller.
+        for mode in ("manual", "automatic"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                store = MiningStateStore(Path(directory) / "state.json")
+                guard = self.guard(mining_start_mode=mode)
+                readings = [(False, "temperature_limit_exceeded", 85),
+                            (False, "temperature_limit_exceeded", 85),
+                            (True, "ok", 65)]
+                guard.check = lambda: readings.pop(0)
+                guard.notify = lambda *args: None
+                manager = FakeManager()
+                publisher = FakePublisher(None)
+                controller = Controller(manager, thermal_guard=guard,
+                                        state_store=store, publisher=publisher,
+                                        auto_start=(mode == "automatic"))
+                self.assertFalse(controller._thermal_check(force=True))
+                self.assertTrue(store.thermal_tripped())
+                self.assertEqual(manager.stop_calls, 1)
+                # Cooling never starts mining without explicit consent.
+                self.assertFalse(controller._thermal_check())
+                self.assertEqual(manager.start_calls, 0)
+                publisher.commands.command = "ON"
+                controller._apply_mqtt_command()
+                self.assertEqual(manager.start_calls, 0)
+                self.assertTrue(store.thermal_tripped())
+                publisher.commands.command = "ON"
+                controller._apply_mqtt_command()
+                self.assertEqual(manager.start_calls, 1)
+                self.assertFalse(store.thermal_tripped())
+                self.assertTrue(store.load())
+
     def test_safe_allows_start(self):
         guard = self.guard()
         guard.check = lambda: (True, "ok", 70)
