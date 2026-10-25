@@ -1,0 +1,50 @@
+name: "XMRig Miner 2.0 (Thermal Test)"
+slug: xmrig_haos_thermal_test
+description: >-
+  Isolated thermal-protection test add-on; installs alongside Beta.2.
+  Installs separately; does not replace XMRig Miner (HAOS Safe).
+version: "2.0.0-thermal-test.1"
+stage: experimental
+url: "https://github.com/Bearstorm/ha-xmrig-addon"
+arch:
+  - amd64
+startup: services
+boot: manual
+init: false
+
+# Retain HAOS Safe isolation. No host privileges or network exposure.
+host_network: false
+host_pid: false
+full_access: false
+apparmor: true
+services:
+  - mqtt:want
+homeassistant_api: true
+
+# Wallet is deliberately empty until the staging operator sets it.
+options:
+  pool: "pool.supportxmr.com"
+  port: 443
+  wallet: ""
+  worker: "HA-BETA"
+  threads: 2
+  priority: 2
+  tls_mode: "auto"
+  thermal_protection_enabled: false
+  thermal_sensor_entity: ""
+  thermal_limit: 80
+  thermal_sensor_timeout: 180
+  thermal_notifications: true
+schema:
+  pool: "str(1,255)"
+  port: port
+  wallet: str
+  worker: "str(1,64)"
+  threads: "int(1,256)"
+  priority: "int(0,5)"
+  tls_mode: "list(auto|enabled|disabled)"
+  thermal_protection_enabled: bool
+  thermal_sensor_entity: str
+  thermal_limit: "int(40,105)"
+  thermal_sensor_timeout: "int(60,3600)"
+  thermal_notifications: bool
