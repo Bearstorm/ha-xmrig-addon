@@ -1,11 +1,12 @@
 # 🪙 XMRig Miner Add-on for Home Assistant
 
 
+
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Add--on-blue.svg)](https://www.home-assistant.io/)
 ![Architecture](https://img.shields.io/badge/Arch-amd64-orange.svg)
 ![HAOS Compatible](https://img.shields.io/badge/HAOS-Compatible-green.svg)
-![Legacy Supervised](https://img.shields.io/badge/Supervised-Legacy-lightgrey.svg)
-![MSR Legacy](https://img.shields.io/badge/MSR-Legacy%20Only-yellow.svg)
+![Supervised MSR](https://img.shields.io/badge/Supervised-Debian%2012-blue.svg)
+![MSR Optional](https://img.shields.io/badge/MSR-Optional-yellow.svg)
 ![RandomX Optimized](https://img.shields.io/badge/RandomX-Optimized-red.svg)
 
 ![Build](https://github.com/Bearstorm/ha-xmrig-addon/actions/workflows/publish.yml/badge.svg)
@@ -13,9 +14,11 @@
 
 ![Release](https://img.shields.io/github/v/release/Bearstorm/ha-xmrig-addon?display_name=tag&style=flat-square)
 ![License](https://img.shields.io/github/license/Bearstorm/ha-xmrig-addon)
-[![Visitors](https://hits.sh/github.com/Bearstorm/ha-xmrig-addon.svg?label=Visitors&style=flat-square)](https://hits.sh/github.com/Bearstorm/ha-xmrig-addon/)
+![Visitors](https://komarev.com/ghpvc/?username=Bearstorm&repo=ha-xmrig-addon&style=flat-square)
 
 
+
+**All-in-One Beta 3 release candidate:** XMRig mining, MQTT ON/OFF and telemetry, automatic/manual startup, and fail-closed CPU thermal protection. [Full guide](xmrig_haos_beta/README.md).
 
 Configurable **Monero (XMR)** mining add-on for Home Assistant OS on **x86_64 (amd64)**. The repository also preserves a separate legacy Supervised/MSR variant for existing installations.
 
@@ -31,7 +34,7 @@ Configurable **Monero (XMR)** mining add-on for Home Assistant OS on **x86_64 (a
 |-------------|---------------------|
 | Home Assistant OS (HAOS), amd64 | **XMRig Miner (HAOS Safe)** |
 | Existing legacy Home Assistant Supervised deployment | **XMRig Miner (Supervised / MSR)** (unsupported Home Assistant installation method) |
-| Experienced HAOS beta tester (amd64) | **XMRig Miner 2.0 (Beta Test)** (standalone experimental beta.2 candidate; separate from stable) |
+| Experienced HAOS beta tester (amd64) | **XMRig Miner 2.0 (All-in-One Beta)** (Beta 3 release candidate on feature branch; separate from stable) |
 
 ### How to check your system:
 Go to:
@@ -76,7 +79,7 @@ Settings → System → About
 | Recommended for new Home Assistant installs | ✅ (HAOS) | ❌ |
 | Python MQTT Discovery / Mining switch in stable image | ❌ | ❌ |
 
-The separate **Beta Test** add-on includes a Python Controller, MQTT Discovery, Mining ON/OFF switch and resource telemetry. Version **2.0.0-beta.2** passed isolated CI and live tests on one real HAOS Supervisor. It remains experimental and separate from stable HAOS Safe.
+The **All-in-One Beta 3 candidate** includes a Python Controller, MQTT Discovery, Mining ON/OFF switch and resource telemetry. Version **2.0.0-beta.2** passed isolated CI and live tests on one real HAOS Supervisor. It remains experimental and separate from stable HAOS Safe.
 
 ---
 
@@ -293,7 +296,7 @@ Please ensure:
 
 **You are responsible for determining and configuring appropriate CPU temperature limits for your specific processor, cooling system, enclosure and operating environment.** Consult the processor manufacturer's specifications and your hardware vendor's guidance; do not copy another user's temperature thresholds. A manufacturer's maximum junction temperature is **not** a recommended continuous operating temperature.
 
-**Operating above normal, manufacturer-recommended sustained temperatures is strongly discouraged.** Set conservative warning and mining-shutdown thresholds based on your own hardware, monitor them continuously while mining, and ensure the shutdown mechanism actually works. This add-on does **not** automatically enforce hardware-specific temperature limits or provide built-in thermal shutdown through the MQTT Mining switch; use suitable independent hardware protection and, if desired, tested Home Assistant automations. Do not assume that a Home Assistant automation can replace CPU hardware protections.
+**Operating above normal, manufacturer-recommended sustained temperatures is strongly discouraged.** Set conservative warning and mining-shutdown thresholds based on your own hardware, monitor them continuously while mining, and ensure the shutdown mechanism actually works. The stable HAOS Safe add-on does **not** provide built-in thermal shutdown; the All-in-One Beta 3 add-on offers optional, configurable fail-closed CPU temperature protection, but use suitable independent hardware protection and, if desired, tested Home Assistant automations. Do not assume that a Home Assistant automation can replace CPU hardware protections.
 
 **Use at your own risk.** The project author and contributors do not accept responsibility for overheating, equipment damage, instability, data loss or other consequences arising from incorrect configuration, inappropriate temperature limits, inadequate cooling or misuse, **to the extent permitted by applicable law**. This disclaimer does not override mandatory consumer rights or liability that cannot legally be excluded.
 

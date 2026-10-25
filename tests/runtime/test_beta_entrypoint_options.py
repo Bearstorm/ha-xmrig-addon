@@ -31,6 +31,7 @@ def write_options(wallet: str = "STAGING-TEST-IDENTIFIER") -> None:
             "threads": 1,
             "priority": 2,
             "tls_mode": "auto",
+            "mining_start_mode": "manual",
         }),
         encoding="utf-8",
     )
@@ -77,7 +78,7 @@ def run() -> None:
     assert not STATE.exists(), "Fresh staging test must not share existing state"
     assert MiningStateStore().load() is False
     run_off_boot("real main() fresh /data/options.json starts safely OFF")
-    assert not STATE.exists(), "First OFF boot must not persist ON"
+    assert MiningStateStore().load() is False, "Manual first boot must persist OFF, not ON"
 
     store = MiningStateStore()
     store.save(True)

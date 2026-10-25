@@ -498,10 +498,10 @@ jobs:
           test -f xmrig_haos_beta/Dockerfile
           test -f xmrig_haos_beta/rootfs/app/main.py
           test -f xmrig_haos_beta/rootfs/app/mqtt_discovery.py
-          # Beta main.py intentionally differs to run its isolated resource sampler.
-          for file in config.py miner_manager.py xmrig_monitor.py mqtt_service.py mqtt_runtime.py; do
-            cmp "xmrig_haos/rootfs/app/$file" "xmrig_haos_beta/rootfs/app/$file"
-          done
+          # All-in-One Beta 3 has its own integrated controller and thermal guard.
+          test -f xmrig_haos_beta/rootfs/app/thermal.py
+          test -f xmrig_haos_beta/rootfs/app/mining_state.py
+          grep -Fq "mining_start_mode:" xmrig_haos_beta/config.yaml
           grep -Fq 'client_id="xmrig-haos-beta-monitor"' xmrig_haos_beta/rootfs/app/mqtt_client.py
           grep -Fq 'xmrig_haos_beta/command' xmrig_haos_beta/rootfs/app/mqtt_commands.py
           grep -Fq 'node_id: str = "xmrig_haos_beta"' xmrig_haos_beta/rootfs/app/mqtt_discovery.py

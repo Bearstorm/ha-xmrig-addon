@@ -88,7 +88,7 @@ class DiscoveryPayloads:
         return f"{self.base_topic}/command"
 
     def discovery_messages(self) -> list[MqttMessage]:
-        device = {"identifiers": [self.node_id], "name": "XMRig Miner 2.0",
+        device = {"identifiers": [self.node_id], "name": "XMRig Miner 2.0 All-in-One Beta",
                   "manufacturer": "XMRig", "model": "HAOS Safe"}
         messages: list[MqttMessage] = []
         for key, label, unit, state_class, icon in SENSORS:

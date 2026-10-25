@@ -22,6 +22,82 @@ class MiningStateStore:
     def __init__(self, path: Path = DEFAULT_STATE_PATH) -> None:
         self.path = Path(path)
 
+    @property
+    def manual_marker(self) -> Path:
+        return self.path.with_name(self.path.name + ".manual")
+
+    @property
+    def thermal_marker(self) -> Path:
+        return self.path.with_name(self.path.name + ".thermal")
+
+    def _marker_exists(self, path: Path, content: bytes) -> bool:
+        try:
+            info = path.lstat()
+            if not stat.S_ISREG(info.st_mode) or path.read_bytes() != content:
+                raise StateStoreError("Invalid mining safety marker")
+            return True
+        except FileNotFoundError:
+            return False
+        except OSError:
+            raise StateStoreError("Unable to inspect mining marker") from None
+
+    def _write_marker(self, path: Path, content: bytes) -> None:
+        temp = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="wb", dir=self.path.parent,
+                    prefix=".xmrig-marker-", delete=False) as stream:
+                temp = stream.name
+                os.fchmod(stream.fileno(), 0o600)
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp, path)
+            temp = None
+            self._sync_directory()
+        except OSError:
+            raise StateStoreError("Unable to persist mining marker") from None
+        finally:
+            if temp is not None:
+                try:
+                    os.unlink(temp)
+                except OSError:
+                    pass
+
+    def _clear_marker(self, path: Path) -> None:
+        try:
+            path.unlink(missing_ok=True)
+            self._sync_directory()
+        except OSError:
+            raise StateStoreError("Unable to clear mining marker") from None
+
+    def manual_pending(self) -> bool:
+        return self._marker_exists(self.manual_marker, b"manual\\n")
+
+    def mark_manual(self) -> None:
+        self._write_marker(self.manual_marker, b"manual\\n")
+
+    def clear_manual(self) -> None:
+        self._clear_marker(self.manual_marker)
+
+    def thermal_tripped(self) -> bool:
+        return self._marker_exists(self.thermal_marker, b"thermal\\n")
+
+    def mark_thermal(self) -> None:
+        self._write_marker(self.thermal_marker, b"thermal\\n")
+
+    def clear_thermal(self) -> None:
+        self._clear_marker(self.thermal_marker)
+
+    def is_first_start(self) -> bool:
+        """True only if no saved mining preference exists; storage errors fail closed."""
+        try:
+            self.path.stat()
+            return False
+        except FileNotFoundError:
+            return True
+        except OSError:
+            raise StateStoreError("Unable to inspect mining state") from None
+
     def load(self) -> bool:
         """Beta first startup is OFF; invalid file also fails closed OFF."""
         try:

@@ -180,7 +180,7 @@ jobs:
           assert beta["options"]["wallet"] == ""
           assert "image" not in beta
           assert "hassio_api" not in beta
-          assert "homeassistant_api" not in beta
+          assert beta.get("homeassistant_api") is True
           print("PASS: HAOS Safe and isolated experimental beta permissions")
           PY
 
@@ -295,6 +295,10 @@ jobs:
             -s tests \
             -p 'test_config.py' \
             -v
+          python -m unittest discover -s tests -p 'test_beta_thermal.py' -v
+          python -m unittest discover -s tests -p 'test_thermal_test_addon.py' -v
+          python -m unittest discover -s tests -p 'test_thermal_timeout.py' -v
+          python -m unittest discover -s tests -p 'test_thermal_auto_start.py' -v
 
           echo "PASS: Python configuration unit tests"
 

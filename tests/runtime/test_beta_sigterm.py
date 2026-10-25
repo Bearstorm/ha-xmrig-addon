@@ -33,19 +33,18 @@ RUNNER = """
 import sys
 from pathlib import Path
 from app.config import MinerConfig
-from app.main import main
+from app.main import Controller
 from app.miner_manager import MinerManager
 from app.mining_state import MiningStateStore
+import signal
 config = MinerConfig(pool="example.invalid", port=443, wallet="CI-PLACEHOLDER",
                      worker="TEST", threads=1, priority=2, tls_mode="auto")
-raise SystemExit(main(
-    config_loader=lambda: config,
-    manager_factory=lambda c: MinerManager(c, binary=sys.argv[1]),
-    monitor_factory=lambda: None,
-    publisher_factory=lambda: None,
-    state_store_factory=lambda: MiningStateStore(Path(sys.argv[2])),
-    install_signals=True,
-))
+manager = MinerManager(config, binary=sys.argv[1])
+controller = Controller(manager, state_store=MiningStateStore(Path(sys.argv[2])),
+                        auto_start=True, poll_interval=0.05)
+signal.signal(signal.SIGTERM, lambda _sig, _frame: controller.request_shutdown())
+signal.signal(signal.SIGINT, lambda _sig, _frame: controller.request_shutdown())
+raise SystemExit(controller.run())
 """
 
 
