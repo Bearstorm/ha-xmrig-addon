@@ -298,6 +298,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_beta_thermal.py' -v
           python -m unittest discover -s tests -p 'test_thermal_test_addon.py' -v
           python -m unittest discover -s tests -p 'test_thermal_timeout.py' -v
+          python -m unittest discover -s tests -p 'test_thermal_auto_start.py' -v
 
           echo "PASS: Python configuration unit tests"
 

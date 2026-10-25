@@ -18,6 +18,7 @@ class IsolationTests(unittest.TestCase):
         self.assertTrue(cfg["homeassistant_api"])
         self.assertFalse(cfg["options"]["thermal_protection_enabled"])
         self.assertEqual(cfg["options"]["thermal_limit"], 80)
+        self.assertEqual(cfg["options"]["mining_start_mode"], "automatic")
         self.assertEqual(cfg["options"]["thermal_sensor_timeout"], 180)
         self.assertEqual(set(cfg["options"]), set(cfg["schema"]))
     def test_mqtt_topics_and_ids_are_isolated(self):
