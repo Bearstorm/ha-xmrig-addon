@@ -75,7 +75,7 @@ class ThermalGuard:
         try:
             self.api("/services/persistent_notification/create", {
                 "title": "XMRig - Thermal Protection",
-                "notification_id": "xmrig_haos_thermal_test_thermal",
+                "notification_id": "xmrig_haos_beta_thermal",
                 "message": "Mining shutdown requested. Reason: " + reason
                     + ". CPU temperature: " + value
                     + ". Configured limit: " + str(self.limit) + " °C."

@@ -14,7 +14,7 @@ class CommandMailbox:
         self._pending: str | None = None
 
     def submit(self, topic: str, payload: bytes, *, retained: bool = False,
-               expected_topic: str = "xmrig_haos_thermal_test/command") -> bool:
+               expected_topic: str = "xmrig_haos_beta/command") -> bool:
         if retained or topic != expected_topic or not isinstance(payload, bytes):
             return False
         if payload not in (b"ON", b"OFF"):
